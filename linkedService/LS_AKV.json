@@ -1,0 +1,11 @@
+{
+	"name": "LS_AKV",
+	"type": "Microsoft.DataFactory/factories/linkedservices",
+	"properties": {
+		"annotations": [],
+		"type": "AzureKeyVault",
+		"typeProperties": {
+			"baseUrl": "https://DataCycleGroup3Keys.vault.azure.net/"
+		}
+	}
+}

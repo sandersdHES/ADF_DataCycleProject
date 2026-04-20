@@ -1,0 +1,173 @@
+{
+	"name": "Run_Knime",
+	"properties": {
+		"activities": [
+			{
+				"name": "Call_If_Monday",
+				"type": "IfCondition",
+				"dependsOn": [
+					{
+						"activity": "Data_Preparation",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"expression": {
+						"value": "@equals(dayOfWeek(pipeline().TriggerTime), 1)",
+						"type": "Expression"
+					},
+					"ifTrueActivities": [
+						{
+							"name": "Call_Model_Selection",
+							"type": "WebActivity",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"method": "POST",
+								"headers": {
+									"Content-Type": "application/json"
+								},
+								"url": "https://api.edu-hub.knime.com/deployments/rest:509f9c76-1fd3-444d-80a6-4df7848b1621/execution",
+								"authentication": {
+									"type": "Basic",
+									"username": "N8XZA3zjIJVLk-P2XxLKBkLv1_aT-bX302wwgIGOmrY",
+									"password": {
+										"type": "AzureKeyVaultSecret",
+										"store": {
+											"referenceName": "LS_AKV",
+											"type": "LinkedServiceReference"
+										},
+										"secretName": "knimeappsecret"
+									}
+								}
+							}
+						}
+					]
+				}
+			},
+			{
+				"name": "Cons",
+				"type": "WebActivity",
+				"dependsOn": [
+					{
+						"activity": "Call_If_Monday",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"method": "POST",
+					"headers": {
+						"Content-Type": "application/json"
+					},
+					"url": "https://api.edu-hub.knime.com/deployments/rest:348633fa-f10f-4a27-99de-11e1707190cb/execution",
+					"authentication": {
+						"type": "Basic",
+						"username": "N8XZA3zjIJVLk-P2XxLKBkLv1_aT-bX302wwgIGOmrY",
+						"password": {
+							"type": "AzureKeyVaultSecret",
+							"store": {
+								"referenceName": "LS_AKV",
+								"type": "LinkedServiceReference"
+							},
+							"secretName": "knimeappsecret"
+						}
+					}
+				}
+			},
+			{
+				"name": "Solar",
+				"type": "WebActivity",
+				"dependsOn": [
+					{
+						"activity": "Call_If_Monday",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"method": "POST",
+					"headers": {
+						"Content-Type": "application/json"
+					},
+					"url": "https://api.edu-hub.knime.com/deployments/rest:eb96aa91-239b-4cf2-8c7e-a8a40516d4f3/execution",
+					"authentication": {
+						"type": "Basic",
+						"username": "N8XZA3zjIJVLk-P2XxLKBkLv1_aT-bX302wwgIGOmrY",
+						"password": {
+							"type": "AzureKeyVaultSecret",
+							"store": {
+								"referenceName": "LS_AKV",
+								"type": "LinkedServiceReference"
+							},
+							"secretName": "knimeappsecret"
+						}
+					}
+				}
+			},
+			{
+				"name": "Data_Preparation",
+				"type": "WebActivity",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"method": "POST",
+					"headers": {
+						"Content-Type": "application/json"
+					},
+					"url": "https://api.edu-hub.knime.com/deployments/rest:e481f0fd-89ba-409a-aaa2-d8a648956949/execution",
+					"authentication": {
+						"type": "Basic",
+						"username": "N8XZA3zjIJVLk-P2XxLKBkLv1_aT-bX302wwgIGOmrY",
+						"password": {
+							"type": "AzureKeyVaultSecret",
+							"store": {
+								"referenceName": "LS_AKV",
+								"type": "LinkedServiceReference"
+							},
+							"secretName": "knimeappsecret"
+						}
+					}
+				}
+			}
+		],
+		"annotations": [],
+		"lastPublishTime": "2026-04-16T06:51:50Z"
+	},
+	"type": "Microsoft.DataFactory/factories/pipelines"
+}

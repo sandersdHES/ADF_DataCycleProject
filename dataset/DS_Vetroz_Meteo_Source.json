@@ -1,0 +1,27 @@
+{
+	"name": "DS_Vetroz_Meteo_Source",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "LS_SFTP_LocalServer",
+			"type": "LinkedServiceReference"
+		},
+		"parameters": {
+			"p_filename": {
+				"type": "string"
+			}
+		},
+		"annotations": [],
+		"type": "Binary",
+		"typeProperties": {
+			"location": {
+				"type": "SftpLocation",
+				"fileName": {
+					"value": "@dataset().p_filename",
+					"type": "Expression"
+				},
+				"folderPath": "/Meteo"
+			}
+		}
+	},
+	"type": "Microsoft.DataFactory/factories/datasets"
+}

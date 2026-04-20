@@ -1,0 +1,17 @@
+{
+	"name": "DS_FileShare_SAC",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "LS_AzureFileShare_SAC",
+			"type": "LinkedServiceReference"
+		},
+		"annotations": [],
+		"type": "Binary",
+		"typeProperties": {
+			"location": {
+				"type": "AzureFileStorageLocation"
+			}
+		}
+	},
+	"type": "Microsoft.DataFactory/factories/datasets"
+}

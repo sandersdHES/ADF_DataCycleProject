@@ -1,0 +1,18 @@
+{
+	"name": "DS_ADLS_SACStaging",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "LS_ADLS_Bronze",
+			"type": "LinkedServiceReference"
+		},
+		"annotations": [],
+		"type": "Binary",
+		"typeProperties": {
+			"location": {
+				"type": "AzureBlobFSLocation",
+				"fileSystem": "sacexport"
+			}
+		}
+	},
+	"type": "Microsoft.DataFactory/factories/datasets"
+}
