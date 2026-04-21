@@ -1,9 +1,0 @@
-{
-	"name": "group3-df",
-	"location": "switzerlandnorth",
-	"identity": {
-		"type": "SystemAssigned",
-		"principalId": "a47e2e80-f6c8-4430-88ba-9679c56dbc1e",
-		"tenantId": "a372f724-c0b2-4ea0-abfb-0eb8c6f84e40"
-	}
-}
