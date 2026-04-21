@@ -1,0 +1,24 @@
+[
+  {
+    "ModelCode": "PV_PROD_V1",
+    "ModelName": "Solar Production Prediction v1 (KNIME Random Forest)",
+    "ModelType": "GradientBoostedTrees",
+    "TargetVariable": "Production_Kwh",
+    "Features": "irradiance_wm2, temp_c, hour, minute, month, day_of_week, is_weekend, quarter_hour",
+    "TrainingStartDate": "2023-02-20",
+    "TrainingEndDate": "2023-04-19",
+    "IsActive": 1,
+    "Notes": "US#29 — Gradient Boosted Trees Regressor (100 trees, lr=0.1, max_depth=5) Trained in KNIME Analytics Platform. Input: solar_production_features.csv from ADLS /ml/knime_input/. Output: production_predictions.csv to ADLS /ml/knime_output/."
+  },
+  {
+    "ModelCode": "CONS_V1",
+    "ModelName": "Building Consumption Prediction v1 (KNIME Gradient Boosted Trees)",
+    "ModelType": "GradientBoostedTrees",
+    "TargetVariable": "Consumption_Kwh",
+    "Features": "temp_c, humidity_pct, precipitation_kgm2, room_occupation_pct, hour, minute, month, day_of_week, is_weekend, is_academic_day, quarter_hour",
+    "TrainingStartDate": "2023-02-20",
+    "TrainingEndDate": "2023-04-19",
+    "IsActive": 1,
+    "Notes": "US#30 — Gradient Boosted Trees Regressor (100 trees, lr=0.1, max_depth=5). Trained in KNIME Analytics Platform. Input: consumption_features.csv from ADLS /ml/knime_input/. Output: consumption_predictions.csv to ADLS /ml/knime_output/."
+  }
+]

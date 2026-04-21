@@ -1,0 +1,30 @@
+name: Validate
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'adf/**'
+      - '.github/workflows/validate.yml'
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: validate-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  adf-validate:
+    name: ADF JSON validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Validates that ADF source JSON in adf/ is internally consistent (no dangling
+      # references between pipelines, datasets, linked services, triggers).
+      - name: Validate ADF source
+        uses: Azure/data-factory-validate-action@v1.1.4
+        with:
+          path: ${{ github.workspace }}/adf

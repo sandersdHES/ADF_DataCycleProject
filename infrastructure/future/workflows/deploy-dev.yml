@@ -1,0 +1,341 @@
+name: Deploy (dev)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'infrastructure/**'
+      - 'adf/**'
+      - 'sql/**'
+      - 'config/**'
+      - 'databricks/**'
+      - 'scripts/**'
+      - '.github/workflows/deploy-dev.yml'
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: deploy-dev
+  cancel-in-progress: false
+
+env:
+  AZURE_LOCATION: switzerlandnorth
+  ENV_NAME: dev
+
+jobs:
+  provision-azure:
+    name: Provision Azure (Bicep)
+    runs-on: ubuntu-latest
+    environment: dev
+    outputs:
+      projectRg: ${{ steps.outputs.outputs.projectRg }}
+      storageAccount: ${{ steps.outputs.outputs.storageAccount }}
+      keyVaultName: ${{ steps.outputs.outputs.keyVaultName }}
+      keyVaultUri: ${{ steps.outputs.outputs.keyVaultUri }}
+      keyVaultId: ${{ steps.outputs.outputs.keyVaultId }}
+      sqlServerFqdn: ${{ steps.outputs.outputs.sqlServerFqdn }}
+      sqlServerName: ${{ steps.outputs.outputs.sqlServerName }}
+      sqlDatabase: ${{ steps.outputs.outputs.sqlDatabase }}
+      databricksWorkspaceUrl: ${{ steps.outputs.outputs.databricksWorkspaceUrl }}
+      databricksWorkspaceName: ${{ steps.outputs.outputs.databricksWorkspaceName }}
+      adfName: ${{ steps.outputs.outputs.adfName }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Deploy Bicep (subscription scope)
+        id: bicep
+        uses: azure/arm-deploy@v2
+        with:
+          scope: subscription
+          region: ${{ env.AZURE_LOCATION }}
+          template: infrastructure/main.bicep
+          parameters: >-
+            infrastructure/parameters/dev.parameters.json
+            tenantId=${{ secrets.AZURE_TENANT_ID }}
+            subscriptionId=${{ secrets.AZURE_SUBSCRIPTION_ID }}
+            sqlAdminPassword=${{ secrets.SQL_ADMIN_PASSWORD }}
+            databricksToken=${{ secrets.DATABRICKS_TOKEN }}
+            adminSqlPassword=${{ secrets.SQL_ADMIN_PASSWORD }}
+            adminVmPassword=${{ secrets.ADMIN_VM_PASSWORD }}
+            studentVmPassword=${{ secrets.ON_PREM_VM_PASSWORD }}
+            knimeSecret=${{ secrets.KNIME_SECRET }}
+            knimeAppId=${{ secrets.KNIME_APP_ID }}
+            knimeAppSecret=${{ secrets.KNIME_API_SECRET }}
+            sacPassword=${{ secrets.SAC_PASSWORD }}
+          deploymentMode: Incremental
+          deploymentName: datacycle-dev-${{ github.run_id }}
+
+      - name: Export outputs
+        id: outputs
+        env:
+          RAW: ${{ steps.bicep.outputs.deploymentOutputs }}
+        run: |
+          set -euo pipefail
+          echo "$RAW" > /tmp/outputs.json
+          jq -r '
+            "projectRg=" + .projectRgName.value,
+            "storageAccount=" + .storageAccountName.value,
+            "keyVaultName=" + .keyVaultName.value,
+            "keyVaultUri=" + .keyVaultUri.value,
+            "keyVaultId=" + .keyVaultId.value,
+            "sqlServerFqdn=" + .sqlServerFqdn.value,
+            "sqlServerName=" + .sqlServerName.value,
+            "sqlDatabase=" + .sqlDatabaseName.value,
+            "databricksWorkspaceUrl=" + .databricksWorkspaceUrl.value,
+            "databricksWorkspaceName=" + .databricksWorkspaceName.value,
+            "adfName=" + .adfName.value
+          ' /tmp/outputs.json >> "$GITHUB_OUTPUT"
+
+      - name: Upload config files to ADLS
+        run: |
+          set -euo pipefail
+          ACCOUNT=${{ steps.outputs.outputs.storageAccount }}
+          for f in config/ml_models_config.json config/electricity_tariff_config.json; do
+            if [ -f "$f" ]; then
+              az storage blob upload \
+                --account-name "$ACCOUNT" \
+                --auth-mode login \
+                --container-name config \
+                --file "$f" \
+                --name "$(basename "$f")" \
+                --overwrite true
+            else
+              echo "WARNING: $f missing — skipping"
+            fi
+          done
+
+  provision-databricks:
+    name: Provision Databricks
+    needs: provision-azure
+    runs-on: ubuntu-latest
+    environment: dev
+    outputs:
+      clusterId: ${{ steps.dbx.outputs.clusterId }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Install Databricks CLI
+        uses: databricks/setup-cli@main
+
+      - name: Run Databricks provisioning script
+        id: dbx
+        env:
+          DATABRICKS_HOST: ${{ needs.provision-azure.outputs.databricksWorkspaceUrl }}
+          DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+          ENVIRONMENT: ${{ env.ENV_NAME }}
+          GITHUB_ACCOUNT: ${{ github.repository_owner }}
+          DATABRICKS_USER: ${{ secrets.DATABRICKS_USER }}
+          KV_RESOURCE_ID: ${{ needs.provision-azure.outputs.keyVaultId }}
+          KV_URI: ${{ needs.provision-azure.outputs.keyVaultUri }}
+        run: |
+          set -euo pipefail
+          bash scripts/deploy_databricks.sh
+          echo "clusterId=$(cat /tmp/databricks_cluster_id.txt)" >> "$GITHUB_OUTPUT"
+
+  deploy-adf:
+    name: Deploy ADF
+    needs: [provision-azure, provision-databricks]
+    runs-on: ubuntu-latest
+    environment: dev
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Export ADF ARM from source
+        uses: Azure/data-factory-export-action@v1.1.4
+        with:
+          path: ${{ github.workspace }}
+          id: /subscriptions/${{ secrets.AZURE_SUBSCRIPTION_ID }}/resourceGroups/${{ needs.provision-azure.outputs.projectRg }}/providers/Microsoft.DataFactory/factories/${{ needs.provision-azure.outputs.adfName }}
+
+      - name: Deploy ADF
+        uses: Azure/data-factory-deploy-action@v1.2.0
+        with:
+          resourceGroupName: ${{ needs.provision-azure.outputs.projectRg }}
+          dataFactoryName: ${{ needs.provision-azure.outputs.adfName }}
+          armTemplateFile: ExportedArmTemplate/ARMTemplateForFactory.json
+          armTemplateParametersFile: ExportedArmTemplate/ARMTemplateParametersForFactory.json
+          additionalParameters: >-
+            factoryName=${{ needs.provision-azure.outputs.adfName }}
+            LS_ADLS_Bronze_properties_typeProperties_url=https://${{ needs.provision-azure.outputs.storageAccount }}.dfs.core.windows.net/
+            LS_AKV_properties_typeProperties_baseUrl=${{ needs.provision-azure.outputs.keyVaultUri }}
+            LS_DevDB_Gold_properties_typeProperties_server=${{ needs.provision-azure.outputs.sqlServerFqdn }}
+            LS_DevDB_Gold_properties_typeProperties_database=${{ needs.provision-azure.outputs.sqlDatabase }}
+            LS_DevDB_Gold_properties_typeProperties_userName=sqladmin
+            LS_BellevueBooking_LocalServer_properties_typeProperties_host=\\\\10.130.25.152\\BellevueBooking
+            LS_BellevueBooking_LocalServer_properties_typeProperties_userId=Student
+            LS_BellevueConso_LocalServer_properties_typeProperties_host=\\\\10.130.25.152\\BellevueConso
+            LS_BellevueConso_LocalServer_properties_typeProperties_userId=Student
+            LS_Solarlogs_LocalServer_properties_typeProperties_host=\\\\10.130.25.152\\Solarlogs
+            LS_Solarlogs_LocalServer_properties_typeProperties_userId=Student
+            LS_SFTP_LocalServer_properties_typeProperties_host=10.130.25.152
+            LS_SFTP_LocalServer_properties_typeProperties_userName=Student
+            AzureDatabricks_properties_typeProperties_existingClusterId=${{ needs.provision-databricks.outputs.clusterId }}
+            LS_ADLS_Bronze_accountKey=${{ secrets.ADLS_ACCOUNT_KEY }}
+            LS_AzureFileShare_SAC_connectionString=${{ secrets.SAC_CONNECTION_STRING }}
+            LS_Databricks_Silver_accessToken=${{ secrets.DATABRICKS_TOKEN }}
+
+  deploy-sql:
+    name: Deploy SQL schema
+    needs: [provision-azure, deploy-adf]
+    runs-on: ubuntu-latest
+    environment: dev
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Install sqlcmd + sqlpackage
+        run: |
+          set -euo pipefail
+          curl https://packages.microsoft.com/keys/microsoft.asc | sudo apt-key add -
+          curl https://packages.microsoft.com/config/ubuntu/22.04/prod.list | sudo tee /etc/apt/sources.list.d/mssql-release.list
+          sudo apt-get update
+          sudo ACCEPT_EULA=Y apt-get install -y mssql-tools18 unixodbc-dev
+          echo "/opt/mssql-tools18/bin" >> "$GITHUB_PATH"
+          curl -L -o /tmp/sqlpackage.zip https://aka.ms/sqlpackage-linux
+          mkdir -p "$HOME/sqlpackage"
+          unzip -q /tmp/sqlpackage.zip -d "$HOME/sqlpackage"
+          chmod +x "$HOME/sqlpackage/sqlpackage"
+          echo "$HOME/sqlpackage" >> "$GITHUB_PATH"
+
+      - name: Check if DB is empty
+        id: check
+        env:
+          SERVER: ${{ needs.provision-azure.outputs.sqlServerFqdn }}
+          DB: ${{ needs.provision-azure.outputs.sqlDatabase }}
+          SQL_USER: sqladmin
+          SQL_PW: ${{ secrets.SQL_ADMIN_PASSWORD }}
+        run: |
+          set -euo pipefail
+          COUNT=$(sqlcmd -S "$SERVER" -d "$DB" -U "$SQL_USER" -P "$SQL_PW" -C -h-1 -W -Q \
+            "SET NOCOUNT ON; SELECT COUNT(*) FROM sys.tables WHERE schema_id = SCHEMA_ID('dbo')" \
+            | tr -d '[:space:]')
+          echo "table_count=$COUNT" >> "$GITHUB_OUTPUT"
+          if [ "$COUNT" = "0" ]; then
+            echo "is_empty=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "is_empty=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Bacpac import (first deploy only)
+        if: steps.check.outputs.is_empty == 'true' && hashFiles('infrastructure/exported/DataCycleDB.bacpac') != ''
+        env:
+          SERVER: ${{ needs.provision-azure.outputs.sqlServerFqdn }}
+          DB: ${{ needs.provision-azure.outputs.sqlDatabase }}
+          SQL_USER: sqladmin
+          SQL_PW: ${{ secrets.SQL_ADMIN_PASSWORD }}
+        run: |
+          set -euo pipefail
+          sqlpackage /Action:Import \
+            /SourceFile:infrastructure/exported/DataCycleDB.bacpac \
+            /TargetServerName:"$SERVER" \
+            /TargetDatabaseName:"$DB" \
+            /TargetUser:"$SQL_USER" \
+            /TargetPassword:"$SQL_PW" \
+            /TargetEncryptConnection:True \
+            /TargetTrustServerCertificate:False
+
+      - name: Apply idempotent DDL
+        if: hashFiles('sql/deploy_schema.sql') != ''
+        uses: azure/sql-action@v2.3
+        with:
+          connection-string: Server=tcp:${{ needs.provision-azure.outputs.sqlServerFqdn }},1433;Database=${{ needs.provision-azure.outputs.sqlDatabase }};Authentication=Active Directory Default;Encrypt=true;TrustServerCertificate=false;
+          path: sql/deploy_schema.sql
+
+  post-deploy-summary:
+    name: Post-deploy summary
+    needs: [provision-azure, provision-databricks, deploy-adf, deploy-sql]
+    runs-on: ubuntu-latest
+    environment: dev
+    steps:
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Fetch SHIR auth key
+        id: shir
+        env:
+          RG: ${{ needs.provision-azure.outputs.projectRg }}
+          ADF: ${{ needs.provision-azure.outputs.adfName }}
+        run: |
+          set -euo pipefail
+          IR_NAME=$(az datafactory integration-runtime list \
+            --resource-group "$RG" --factory-name "$ADF" \
+            --query "[?properties.type=='SelfHosted'].name | [0]" -o tsv)
+          if [ -z "$IR_NAME" ] || [ "$IR_NAME" = "null" ]; then
+            echo "auth_key=" >> "$GITHUB_OUTPUT"
+            echo "ir_name=" >> "$GITHUB_OUTPUT"
+          else
+            KEY=$(az datafactory integration-runtime list-auth-key \
+              --resource-group "$RG" --factory-name "$ADF" \
+              --integration-runtime-name "$IR_NAME" \
+              --query authKey1 -o tsv)
+            echo "auth_key=$KEY" >> "$GITHUB_OUTPUT"
+            echo "ir_name=$IR_NAME" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Write summary
+        env:
+          ADF: ${{ needs.provision-azure.outputs.adfName }}
+          RG: ${{ needs.provision-azure.outputs.projectRg }}
+          STORAGE: ${{ needs.provision-azure.outputs.storageAccount }}
+          DBX_URL: ${{ needs.provision-azure.outputs.databricksWorkspaceUrl }}
+          SQL_FQDN: ${{ needs.provision-azure.outputs.sqlServerFqdn }}
+          SQL_DB: ${{ needs.provision-azure.outputs.sqlDatabase }}
+          CLUSTER_ID: ${{ needs.provision-databricks.outputs.clusterId }}
+          IR_NAME: ${{ steps.shir.outputs.ir_name }}
+          IR_KEY: ${{ steps.shir.outputs.auth_key }}
+        run: |
+          {
+            echo "## Deploy summary (dev)"
+            echo ""
+            echo "| Resource | Value |"
+            echo "|---|---|"
+            echo "| Resource group | \`$RG\` |"
+            echo "| ADF | [\`$ADF\`](https://adf.azure.com/en/home?factory=/subscriptions/${{ secrets.AZURE_SUBSCRIPTION_ID }}/resourceGroups/$RG/providers/Microsoft.DataFactory/factories/$ADF) |"
+            echo "| ADLS | \`$STORAGE\` |"
+            echo "| SQL | \`$SQL_FQDN\` / \`$SQL_DB\` |"
+            echo "| Databricks workspace | $DBX_URL |"
+            echo "| Cluster ID | \`$CLUSTER_ID\` |"
+            echo ""
+            if [ -n "$IR_NAME" ]; then
+              echo "### Self-hosted IR: \`$IR_NAME\`"
+              echo ""
+              echo "Register the on-prem SHIR node with this key (do NOT share publicly):"
+              echo ""
+              echo "\`\`\`"
+              echo "$IR_KEY"
+              echo "\`\`\`"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"

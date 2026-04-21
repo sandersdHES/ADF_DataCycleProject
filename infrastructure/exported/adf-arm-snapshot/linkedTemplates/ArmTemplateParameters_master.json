@@ -1,0 +1,66 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentParameters.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "factoryName": {
+            "value": "group3-df"
+        },
+        "LS_ADLS_Bronze_accountKey": {
+            "value": ""
+        },
+        "LS_AzureFileShare_SAC_connectionString": {
+            "value": ""
+        },
+        "LS_Databricks_Silver_accessToken": {
+            "value": ""
+        },
+        "AzureDatabricks_properties_typeProperties_existingClusterId": {
+            "value": "0223-115927-nvtos4a4"
+        },
+        "LS_ADLS_Bronze_properties_typeProperties_url": {
+            "value": "https://adlsbellevuegrp3.dfs.core.windows.net/"
+        },
+        "LS_AKV_properties_typeProperties_baseUrl": {
+            "value": "https://DataCycleGroup3Keys.vault.azure.net/"
+        },
+        "LS_BellevueBooking_LocalServer_properties_typeProperties_host": {
+            "value": "\\\\10.130.25.152\\BellevueBooking"
+        },
+        "LS_BellevueBooking_LocalServer_properties_typeProperties_userId": {
+            "value": "Student"
+        },
+        "LS_BellevueConso_LocalServer_properties_typeProperties_host": {
+            "value": "\\\\10.130.25.152\\BellevueConso"
+        },
+        "LS_BellevueConso_LocalServer_properties_typeProperties_userId": {
+            "value": "Student"
+        },
+        "LS_DevDB_Gold_properties_typeProperties_server": {
+            "value": "sqlserver-bellevue-grp3.database.windows.net"
+        },
+        "LS_DevDB_Gold_properties_typeProperties_database": {
+            "value": "DevDB"
+        },
+        "LS_DevDB_Gold_properties_typeProperties_userName": {
+            "value": "dylan.sanderso"
+        },
+        "LS_SFTP_LocalServer_properties_typeProperties_host": {
+            "value": "10.130.25.152"
+        },
+        "LS_SFTP_LocalServer_properties_typeProperties_userName": {
+            "value": "Student"
+        },
+        "LS_Solarlogs_LocalServer_properties_typeProperties_host": {
+            "value": "\\\\10.130.25.152\\Solarlogs"
+        },
+        "LS_Solarlogs_LocalServer_properties_typeProperties_userId": {
+            "value": "Student"
+        },
+        "containerUri": {
+            "value": ""
+        },
+        "containerSasToken": {
+            "value": ""
+        }
+    }
+}

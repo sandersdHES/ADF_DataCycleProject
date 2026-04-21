@@ -1,0 +1,59 @@
+name: Deploy ADF
+
+# Deploys the ADF source JSON in adf/ to the existing factory. Infrastructure is
+# assumed to already exist (provisioned manually / via subscription transfer) —
+# this workflow is the day-to-day CI/CD path for pipeline + linked service changes.
+#
+# Requires GitHub Environment 'prod' with:
+#   - AZURE_CLIENT_ID / AZURE_TENANT_ID / AZURE_SUBSCRIPTION_ID (OIDC federated identity)
+#   - AZURE_RESOURCE_GROUP (variable) — the RG containing the factory
+#   - AZURE_ADF_NAME       (variable) — the factory name, e.g. group3-df
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'adf/**'
+      - '.github/workflows/deploy-adf.yml'
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: deploy-adf
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Export + deploy ADF ARM
+    runs-on: ubuntu-latest
+    environment: prod
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      # Builds ARMTemplateForFactory.json from adf/ source — no adf_publish branch needed.
+      - name: Export ADF ARM from source
+        uses: Azure/data-factory-export-action@v1.1.4
+        with:
+          path: ${{ github.workspace }}
+          id: /subscriptions/${{ secrets.AZURE_SUBSCRIPTION_ID }}/resourceGroups/${{ vars.AZURE_RESOURCE_GROUP }}/providers/Microsoft.DataFactory/factories/${{ vars.AZURE_ADF_NAME }}
+
+      # Stops triggers, deploys the linked-template master with SAS staging, restarts triggers.
+      - name: Deploy ADF
+        uses: Azure/data-factory-deploy-action@v1.2.0
+        with:
+          resourceGroupName: ${{ vars.AZURE_RESOURCE_GROUP }}
+          dataFactoryName: ${{ vars.AZURE_ADF_NAME }}
+          armTemplateFile: ExportedArmTemplate/ARMTemplateForFactory.json
+          armTemplateParametersFile: ExportedArmTemplate/ARMTemplateParametersForFactory.json
+          additionalParameters: >-
+            factoryName=${{ vars.AZURE_ADF_NAME }}

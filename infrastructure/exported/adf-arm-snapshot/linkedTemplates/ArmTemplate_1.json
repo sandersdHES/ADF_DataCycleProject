@@ -1,0 +1,1702 @@
+{
+    "$schema": "http://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "factoryName": {
+            "type": "string",
+            "metadata": "Data Factory name",
+            "defaultValue": "group3-df"
+        },
+        "AzureDatabricks_properties_typeProperties_existingClusterId": {
+            "type": "string",
+            "defaultValue": "0223-115927-nvtos4a4"
+        },
+        "LS_BellevueBooking_LocalServer_properties_typeProperties_host": {
+            "type": "string",
+            "defaultValue": "\\\\10.130.25.152\\BellevueBooking"
+        },
+        "LS_BellevueBooking_LocalServer_properties_typeProperties_userId": {
+            "type": "string",
+            "defaultValue": "Student"
+        },
+        "LS_BellevueConso_LocalServer_properties_typeProperties_host": {
+            "type": "string",
+            "defaultValue": "\\\\10.130.25.152\\BellevueConso"
+        },
+        "LS_BellevueConso_LocalServer_properties_typeProperties_userId": {
+            "type": "string",
+            "defaultValue": "Student"
+        },
+        "LS_DevDB_Gold_properties_typeProperties_server": {
+            "type": "string",
+            "defaultValue": "sqlserver-bellevue-grp3.database.windows.net"
+        },
+        "LS_DevDB_Gold_properties_typeProperties_database": {
+            "type": "string",
+            "defaultValue": "DevDB"
+        },
+        "LS_DevDB_Gold_properties_typeProperties_userName": {
+            "type": "string",
+            "defaultValue": "dylan.sanderso"
+        },
+        "LS_SFTP_LocalServer_properties_typeProperties_host": {
+            "type": "string",
+            "defaultValue": "10.130.25.152"
+        },
+        "LS_SFTP_LocalServer_properties_typeProperties_userName": {
+            "type": "string",
+            "defaultValue": "Student"
+        },
+        "LS_Solarlogs_LocalServer_properties_typeProperties_host": {
+            "type": "string",
+            "defaultValue": "\\\\10.130.25.152\\Solarlogs"
+        },
+        "LS_Solarlogs_LocalServer_properties_typeProperties_userId": {
+            "type": "string",
+            "defaultValue": "Student"
+        }
+    },
+    "variables": {
+        "factoryId": "[concat('Microsoft.DataFactory/factories/', parameters('factoryName'))]"
+    },
+    "resources": [
+        {
+            "name": "[concat(parameters('factoryName'), '/AzureDatabricks')]",
+            "type": "Microsoft.DataFactory/factories/linkedServices",
+            "apiVersion": "2018-06-01",
+            "properties": {
+                "annotations": [],
+                "type": "AzureDatabricks",
+                "typeProperties": {
+                    "domain": "https://adb-7405619109510762.2.azuredatabricks.net",
+                    "accessToken": {
+                        "type": "AzureKeyVaultSecret",
+                        "store": {
+                            "referenceName": "LS_AKV",
+                            "type": "LinkedServiceReference"
+                        },
+                        "secretName": "Databricks-Access-Token"
+                    },
+                    "existingClusterId": "[parameters('AzureDatabricks_properties_typeProperties_existingClusterId')]"
+                }
+            },
+            "dependsOn": []
+        },
+        {
+            "name": "[concat(parameters('factoryName'), '/LS_BellevueBooking_LocalServer')]",
+            "type": "Microsoft.DataFactory/factories/linkedServices",
+            "apiVersion": "2018-06-01",
+            "properties": {
+                "annotations": [],
+                "type": "FileServer",
+                "typeProperties": {
+                    "host": "[parameters('LS_BellevueBooking_LocalServer_properties_typeProperties_host')]",
+                    "userId": "[parameters('LS_BellevueBooking_LocalServer_properties_typeProperties_userId')]",
+                    "password": {
+                        "type": "AzureKeyVaultSecret",
+                        "store": {
+                            "referenceName": "LS_AKV",
+                            "type": "LinkedServiceReference"
+                        },
+                        "secretName": "Student-VM-Password"
+                    }
+                },
+                "connectVia": {
+                    "referenceName": "Group3-VM-Runtime",
+                    "type": "IntegrationRuntimeReference"
+                }
+            },
+            "dependsOn": []
+        },
+        {
+            "name": "[concat(parameters('factoryName'), '/LS_BellevueConso_LocalServer')]",
+            "type": "Microsoft.DataFactory/factories/linkedServices",
+            "apiVersion": "2018-06-01",
+            "properties": {
+                "annotations": [],
+                "type": "FileServer",
+                "typeProperties": {
+                    "host": "[parameters('LS_BellevueConso_LocalServer_properties_typeProperties_host')]",
+                    "userId": "[parameters('LS_BellevueConso_LocalServer_properties_typeProperties_userId')]",
+                    "password": {
+                        "type": "AzureKeyVaultSecret",
+                        "store": {
+                            "referenceName": "LS_AKV",
+                            "type": "LinkedServiceReference"
+                        },
+                        "secretName": "Student-VM-Password"
+                    }
+                },
+                "connectVia": {
+                    "referenceName": "Group3-VM-Runtime",
+                    "type": "IntegrationRuntimeReference"
+                }
+            },
+            "dependsOn": []
+        },
+        {
+            "name": "[concat(parameters('factoryName'), '/LS_DevDB_Gold')]",
+            "type": "Microsoft.DataFactory/factories/linkedServices",
+            "apiVersion": "2018-06-01",
+            "properties": {
+                "annotations": [],
+                "type": "AzureSqlDatabase",
+                "typeProperties": {
+                    "server": "[parameters('LS_DevDB_Gold_properties_typeProperties_server')]",
+                    "database": "[parameters('LS_DevDB_Gold_properties_typeProperties_database')]",
+                    "encrypt": "mandatory",
+                    "trustServerCertificate": false,
+                    "authenticationType": "SQL",
+                    "userName": "[parameters('LS_DevDB_Gold_properties_typeProperties_userName')]",
+                    "password": {
+                        "type": "AzureKeyVaultSecret",
+                        "store": {
+                            "referenceName": "LS_AKV",
+                            "type": "LinkedServiceReference"
+                        },
+                        "secretName": "Admin-SQL-Password"
+                    }
+                }
+            },
+            "dependsOn": []
+        },
+        {
+            "name": "[concat(parameters('factoryName'), '/LS_SFTP_LocalServer')]",
+            "type": "Microsoft.DataFactory/factories/linkedServices",
+            "apiVersion": "2018-06-01",
+            "properties": {
+                "annotations": [],
+                "type": "Sftp",
+                "typeProperties": {
+                    "host": "[parameters('LS_SFTP_LocalServer_properties_typeProperties_host')]",
+                    "port": 22,
+                    "skipHostKeyValidation": true,
+                    "authenticationType": "Basic",
+                    "userName": "[parameters('LS_SFTP_LocalServer_properties_typeProperties_userName')]",
+                    "password": {
+                        "type": "AzureKeyVaultSecret",
+                        "store": {
+                            "referenceName": "LS_AKV",
+                            "type": "LinkedServiceReference"
+                        },
+                        "secretName": "Student-VM-Password"
+                    }
+                },
+                "connectVia": {
+                    "referenceName": "Group3-VM-Runtime",
+                    "type": "IntegrationRuntimeReference"
+                }
+            },
+            "dependsOn": []
+        },
+        {
+            "name": "[concat(parameters('factoryName'), '/LS_Solarlogs_LocalServer')]",
+            "type": "Microsoft.DataFactory/factories/linkedServices",
+            "apiVersion": "2018-06-01",
+            "properties": {
+                "annotations": [],
+                "type": "FileServer",
+                "typeProperties": {
+                    "host": "[parameters('LS_Solarlogs_LocalServer_properties_typeProperties_host')]",
+                    "userId": "[parameters('LS_Solarlogs_LocalServer_properties_typeProperties_userId')]",
+                    "password": {
+                        "type": "AzureKeyVaultSecret",
+                        "store": {
+                            "referenceName": "LS_AKV",
+                            "type": "LinkedServiceReference"
+                        },
+                        "secretName": "Student-VM-Password"
+                    }
+                },
+                "connectVia": {
+                    "referenceName": "Group3-VM-Runtime",
+                    "type": "IntegrationRuntimeReference"
+                }
+            },
+            "dependsOn": []
+        },
+        {
+            "name": "[concat(parameters('factoryName'), '/PL_SAC_Export')]",
+            "type": "Microsoft.DataFactory/factories/pipelines",
+            "apiVersion": "2018-06-01",
+            "properties": {
+                "activities": [
+                    {
+                        "name": "Export_Gold_to_SAC",
+                        "type": "DatabricksNotebook",
+                        "dependsOn": [],
+                        "policy": {
+                            "timeout": "0.12:00:00",
+                            "retry": 0,
+                            "retryIntervalInSeconds": 30,
+                            "secureOutput": false,
+                            "secureInput": false
+                        },
+                        "userProperties": [],
+                        "typeProperties": {
+                            "notebookPath": "/Users/dylan.sanderso@hes-so.ch/ADF_DataCycleProject/databricks/notebooks/sac_export_to_adls"
+                        },
+                        "linkedServiceName": {
+                            "referenceName": "AzureDatabricks",
+                            "type": "LinkedServiceReference"
+                        }
+                    },
+                    {
+                        "name": "Copy_to_FileShare",
+                        "type": "Copy",
+                        "dependsOn": [
+                            {
+                                "activity": "Export_Gold_to_SAC",
+                                "dependencyConditions": [
+                                    "Succeeded"
+                                ]
+                            }
+                        ],
+                        "policy": {
+                            "timeout": "0.12:00:00",
+                            "retry": 0,
+                            "retryIntervalInSeconds": 30,
+                            "secureOutput": false,
+                            "secureInput": false
+                        },
+                        "userProperties": [],
+                        "typeProperties": {
+                            "source": {
+                                "type": "BinarySource",
+                                "storeSettings": {
+                                    "type": "AzureBlobFSReadSettings",
+                                    "recursive": true,
+                                    "wildcardFileName": "*.csv",
+                                    "deleteFilesAfterCompletion": false
+                                },
+                                "formatSettings": {
+                                    "type": "BinaryReadSettings"
+                                }
+                            },
+                            "sink": {
+                                "type": "BinarySink",
+                                "storeSettings": {
+                                    "type": "AzureFileStorageWriteSettings",
+                                    "copyBehavior": "PreserveHierarchy"
+                                }
+                            },
+                            "enableStaging": false
+                        },
+                        "inputs": [
+                            {
+                                "referenceName": "DS_ADLS_SACStaging",
+                                "type": "DatasetReference",
+                                "parameters": {}
+                            }
+                        ],
+                        "outputs": [
+                            {
+                                "referenceName": "DS_FileShare_SAC",
+                                "type": "DatasetReference",
+                                "parameters": {}
+                            }
+                        ]
+                    }
+                ],
+                "policy": {
+                    "elapsedTimeMetric": {}
+                },
+                "annotations": [],
+                "lastPublishTime": "2026-03-19T14:30:10Z"
+            },
+            "dependsOn": [
+                "[concat(variables('factoryId'), '/linkedServices/AzureDatabricks')]"
+            ]
+        },
+        {
+            "name": "[concat(parameters('factoryName'), '/PL_Upload_Pred_Gold')]",
+            "type": "Microsoft.DataFactory/factories/pipelines",
+            "apiVersion": "2018-06-01",
+            "properties": {
+                "activities": [
+                    {
+                        "name": "Load Predictions to Gold",
+                        "type": "DatabricksNotebook",
+                        "dependsOn": [
+                            {
+                                "activity": "Knime Run",
+                                "dependencyConditions": [
+                                    "Succeeded"
+                                ]
+                            }
+                        ],
+                        "policy": {
+                            "timeout": "0.12:00:00",
+                            "retry": 0,
+                            "retryIntervalInSeconds": 30,
+                            "secureOutput": false,
+                            "secureInput": false
+                        },
+                        "userProperties": [],
+                        "typeProperties": {
+                            "notebookPath": "/Users/dylan.sanderso@hes-so.ch/ADF_DataCycleProject/databricks/notebooks/ml_load_predictions"
+                        },
+                        "linkedServiceName": {
+                            "referenceName": "AzureDatabricks",
+                            "type": "LinkedServiceReference"
+                        }
+                    },
+                    {
+                        "name": "Knime Run",
+                        "type": "ExecutePipeline",
+                        "dependsOn": [],
+                        "policy": {
+                            "secureInput": false
+                        },
+                        "userProperties": [],
+                        "typeProperties": {
+                            "pipeline": {
+                                "referenceName": "Run_Knime",
+                                "type": "PipelineReference"
+                            },
+                            "waitOnCompletion": true,
+                            "parameters": {}
+                        }
+                    }
+                ],
+                "policy": {
+                    "elapsedTimeMetric": {}
+                },
+                "annotations": [],
+                "lastPublishTime": "2026-04-16T06:51:50Z"
+            },
+            "dependsOn": [
+                "[concat(variables('factoryId'), '/linkedServices/AzureDatabricks')]"
+            ]
+        },
+        {
+            "name": "[concat(parameters('factoryName'), '/DS_Vetroz_Booking_Source')]",
+            "type": "Microsoft.DataFactory/factories/datasets",
+            "apiVersion": "2018-06-01",
+            "properties": {
+                "linkedServiceName": {
+                    "referenceName": "LS_BellevueBooking_LocalServer",
+                    "type": "LinkedServiceReference"
+                },
+                "annotations": [],
+                "type": "Binary",
+                "typeProperties": {
+                    "location": {
+                        "type": "FileServerLocation"
+                    }
+                }
+            },
+            "dependsOn": [
+                "[concat(variables('factoryId'), '/linkedServices/LS_BellevueBooking_LocalServer')]"
+            ]
+        },
+        {
+            "name": "[concat(parameters('factoryName'), '/DS_Vetroz_Conso_Source')]",
+            "type": "Microsoft.DataFactory/factories/datasets",
+            "apiVersion": "2018-06-01",
+            "properties": {
+                "linkedServiceName": {
+                    "referenceName": "LS_BellevueConso_LocalServer",
+                    "type": "LinkedServiceReference"
+                },
+                "annotations": [],
+                "type": "Binary",
+                "typeProperties": {
+                    "location": {
+                        "type": "FileServerLocation"
+                    }
+                }
+            },
+            "dependsOn": [
+                "[concat(variables('factoryId'), '/linkedServices/LS_BellevueConso_LocalServer')]"
+            ]
+        },
+        {
+            "name": "[concat(parameters('factoryName'), '/DS_Vetroz_FutureForecast_Source')]",
+            "type": "Microsoft.DataFactory/factories/datasets",
+            "apiVersion": "2018-06-01",
+            "properties": {
+                "linkedServiceName": {
+                    "referenceName": "LS_SFTP_LocalServer",
+                    "type": "LinkedServiceReference"
+                },
+                "parameters": {
+                    "p_filename": {
+                        "type": "string"
+                    }
+                },
+                "annotations": [],
+                "type": "Binary",
+                "typeProperties": {
+                    "location": {
+                        "type": "SftpLocation",
+                        "folderPath": "/Meteo2"
+                    }
+                }
+            },
+            "dependsOn": [
+                "[concat(variables('factoryId'), '/linkedServices/LS_SFTP_LocalServer')]"
+            ]
+        },
+        {
+            "name": "[concat(parameters('factoryName'), '/DS_Vetroz_Meteo_Source')]",
+            "type": "Microsoft.DataFactory/factories/datasets",
+            "apiVersion": "2018-06-01",
+            "properties": {
+                "linkedServiceName": {
+                    "referenceName": "LS_SFTP_LocalServer",
+                    "type": "LinkedServiceReference"
+                },
+                "parameters": {
+                    "p_filename": {
+                        "type": "string"
+                    }
+                },
+                "annotations": [],
+                "type": "Binary",
+                "typeProperties": {
+                    "location": {
+                        "type": "SftpLocation",
+                        "fileName": {
+                            "value": "@dataset().p_filename",
+                            "type": "Expression"
+                        },
+                        "folderPath": "/Meteo"
+                    }
+                }
+            },
+            "dependsOn": [
+                "[concat(variables('factoryId'), '/linkedServices/LS_SFTP_LocalServer')]"
+            ]
+        },
+        {
+            "name": "[concat(parameters('factoryName'), '/DS_Vetroz_Solar_Source')]",
+            "type": "Microsoft.DataFactory/factories/datasets",
+            "apiVersion": "2018-06-01",
+            "properties": {
+                "linkedServiceName": {
+                    "referenceName": "LS_Solarlogs_LocalServer",
+                    "type": "LinkedServiceReference"
+                },
+                "annotations": [],
+                "type": "Binary",
+                "typeProperties": {
+                    "location": {
+                        "type": "FileServerLocation"
+                    }
+                }
+            },
+            "dependsOn": [
+                "[concat(variables('factoryId'), '/linkedServices/LS_Solarlogs_LocalServer')]"
+            ]
+        },
+        {
+            "name": "[concat(parameters('factoryName'), '/PL_Bronze_Bookings')]",
+            "type": "Microsoft.DataFactory/factories/pipelines",
+            "apiVersion": "2018-06-01",
+            "properties": {
+                "activities": [
+                    {
+                        "name": "Get Source List",
+                        "type": "GetMetadata",
+                        "dependsOn": [],
+                        "policy": {
+                            "timeout": "0.12:00:00",
+                            "retry": 0,
+                            "retryIntervalInSeconds": 30,
+                            "secureOutput": false,
+                            "secureInput": false
+                        },
+                        "userProperties": [],
+                        "typeProperties": {
+                            "dataset": {
+                                "referenceName": "DS_Vetroz_Booking_Source",
+                                "type": "DatasetReference",
+                                "parameters": {}
+                            },
+                            "fieldList": [
+                                "childItems"
+                            ],
+                            "storeSettings": {
+                                "type": "FileServerReadSettings",
+                                "recursive": true,
+                                "enablePartitionDiscovery": false
+                            },
+                            "formatSettings": {
+                                "type": "BinaryReadSettings"
+                            }
+                        }
+                    },
+                    {
+                        "name": "Get Destination List",
+                        "type": "GetMetadata",
+                        "dependsOn": [
+                            {
+                                "activity": "Get Source List",
+                                "dependencyConditions": [
+                                    "Succeeded"
+                                ]
+                            }
+                        ],
+                        "policy": {
+                            "timeout": "0.12:00:00",
+                            "retry": 0,
+                            "retryIntervalInSeconds": 30,
+                            "secureOutput": false,
+                            "secureInput": false
+                        },
+                        "userProperties": [],
+                        "typeProperties": {
+                            "dataset": {
+                                "referenceName": "DS_Vetroz_Booking_Bronze",
+                                "type": "DatasetReference",
+                                "parameters": {}
+                            },
+                            "fieldList": [
+                                "childItems"
+                            ],
+                            "storeSettings": {
+                                "type": "AzureBlobFSReadSettings",
+                                "recursive": true,
+                                "enablePartitionDiscovery": false
+                            },
+                            "formatSettings": {
+                                "type": "BinaryReadSettings"
+                            }
+                        }
+                    },
+                    {
+                        "name": "Keep only new files",
+                        "type": "Filter",
+                        "dependsOn": [
+                            {
+                                "activity": "Get Destination List",
+                                "dependencyConditions": [
+                                    "Succeeded"
+                                ]
+                            }
+                        ],
+                        "userProperties": [],
+                        "typeProperties": {
+                            "items": {
+                                "value": "@activity('Get Source List').output.childItems",
+                                "type": "Expression"
+                            },
+                            "condition": {
+                                "value": "@not(contains(activity('Get Destination List').output.childItems, item()))",
+                                "type": "Expression"
+                            }
+                        }
+                    },
+                    {
+                        "name": "ForEach1",
+                        "type": "ForEach",
+                        "dependsOn": [
+                            {
+                                "activity": "Keep only new files",
+                                "dependencyConditions": [
+                                    "Succeeded"
+                                ]
+                            }
+                        ],
+                        "userProperties": [],
+                        "typeProperties": {
+                            "items": {
+                                "value": "@activity('Keep only new files').output.value",
+                                "type": "Expression"
+                            },
+                            "batchCount": 50,
+                            "activities": [
+                                {
+                                    "name": "Copy data1",
+                                    "type": "Copy",
+                                    "dependsOn": [],
+                                    "policy": {
+                                        "timeout": "0.12:00:00",
+                                        "retry": 0,
+                                        "retryIntervalInSeconds": 30,
+                                        "secureOutput": false,
+                                        "secureInput": false
+                                    },
+                                    "userProperties": [],
+                                    "typeProperties": {
+                                        "source": {
+                                            "type": "BinarySource",
+                                            "storeSettings": {
+                                                "type": "FileServerReadSettings",
+                                                "recursive": true,
+                                                "fileFilter": {
+                                                    "value": "@item().name",
+                                                    "type": "Expression"
+                                                },
+                                                "deleteFilesAfterCompletion": false
+                                            },
+                                            "formatSettings": {
+                                                "type": "BinaryReadSettings"
+                                            }
+                                        },
+                                        "sink": {
+                                            "type": "BinarySink",
+                                            "storeSettings": {
+                                                "type": "AzureBlobFSWriteSettings",
+                                                "copyBehavior": "PreserveHierarchy"
+                                            }
+                                        },
+                                        "enableStaging": false
+                                    },
+                                    "inputs": [
+                                        {
+                                            "referenceName": "DS_Vetroz_Booking_Source",
+                                            "type": "DatasetReference",
+                                            "parameters": {}
+                                        }
+                                    ],
+                                    "outputs": [
+                                        {
+                                            "referenceName": "DS_Vetroz_Booking_Bronze",
+                                            "type": "DatasetReference",
+                                            "parameters": {}
+                                        }
+                                    ]
+                                }
+                            ]
+                        }
+                    }
+                ],
+                "policy": {
+                    "elapsedTimeMetric": {}
+                },
+                "annotations": [],
+                "lastPublishTime": "2026-03-02T13:45:11Z"
+            },
+            "dependsOn": [
+                "[concat(variables('factoryId'), '/datasets/DS_Vetroz_Booking_Source')]"
+            ]
+        },
+        {
+            "name": "[concat(parameters('factoryName'), '/PL_Bronze_Conso')]",
+            "type": "Microsoft.DataFactory/factories/pipelines",
+            "apiVersion": "2018-06-01",
+            "properties": {
+                "activities": [
+                    {
+                        "name": "Get Source List",
+                        "type": "GetMetadata",
+                        "dependsOn": [],
+                        "policy": {
+                            "timeout": "0.12:00:00",
+                            "retry": 0,
+                            "retryIntervalInSeconds": 30,
+                            "secureOutput": false,
+                            "secureInput": false
+                        },
+                        "userProperties": [],
+                        "typeProperties": {
+                            "dataset": {
+                                "referenceName": "DS_Vetroz_Conso_Source",
+                                "type": "DatasetReference",
+                                "parameters": {}
+                            },
+                            "fieldList": [
+                                "childItems"
+                            ],
+                            "storeSettings": {
+                                "type": "FileServerReadSettings",
+                                "recursive": true,
+                                "enablePartitionDiscovery": false
+                            },
+                            "formatSettings": {
+                                "type": "BinaryReadSettings"
+                            }
+                        }
+                    },
+                    {
+                        "name": "Get Destination List",
+                        "type": "GetMetadata",
+                        "dependsOn": [
+                            {
+                                "activity": "Get Source List",
+                                "dependencyConditions": [
+                                    "Succeeded"
+                                ]
+                            }
+                        ],
+                        "policy": {
+                            "timeout": "0.12:00:00",
+                            "retry": 0,
+                            "retryIntervalInSeconds": 30,
+                            "secureOutput": false,
+                            "secureInput": false
+                        },
+                        "userProperties": [],
+                        "typeProperties": {
+                            "dataset": {
+                                "referenceName": "DS_Vetroz_Conso_Bronze",
+                                "type": "DatasetReference",
+                                "parameters": {
+                                    "p_folder": "*"
+                                }
+                            },
+                            "fieldList": [
+                                "childItems"
+                            ],
+                            "storeSettings": {
+                                "type": "AzureBlobFSReadSettings",
+                                "recursive": true,
+                                "enablePartitionDiscovery": false
+                            },
+                            "formatSettings": {
+                                "type": "BinaryReadSettings"
+                            }
+                        }
+                    },
+                    {
+                        "name": "Keep only new files",
+                        "type": "Filter",
+                        "dependsOn": [
+                            {
+                                "activity": "Get Destination List",
+                                "dependencyConditions": [
+                                    "Succeeded"
+                                ]
+                            }
+                        ],
+                        "userProperties": [],
+                        "typeProperties": {
+                            "items": {
+                                "value": "@activity('Get Source List').output.childItems",
+                                "type": "Expression"
+                            },
+                            "condition": {
+                                "value": "@not(contains(activity('Get Destination List').output.childItems, item()))",
+                                "type": "Expression"
+                            }
+                        }
+                    },
+                    {
+                        "name": "ForEach1",
+                        "type": "ForEach",
+                        "dependsOn": [
+                            {
+                                "activity": "Keep only new files",
+                                "dependencyConditions": [
+                                    "Succeeded"
+                                ]
+                            }
+                        ],
+                        "userProperties": [],
+                        "typeProperties": {
+                            "items": {
+                                "value": "@activity('Keep only new files').output.value",
+                                "type": "Expression"
+                            },
+                            "batchCount": 50,
+                            "activities": [
+                                {
+                                    "name": "Copy data1",
+                                    "type": "Copy",
+                                    "dependsOn": [],
+                                    "policy": {
+                                        "timeout": "0.12:00:00",
+                                        "retry": 0,
+                                        "retryIntervalInSeconds": 30,
+                                        "secureOutput": false,
+                                        "secureInput": false
+                                    },
+                                    "userProperties": [],
+                                    "typeProperties": {
+                                        "source": {
+                                            "type": "BinarySource",
+                                            "storeSettings": {
+                                                "type": "FileServerReadSettings",
+                                                "recursive": true,
+                                                "fileFilter": {
+                                                    "value": "@item().name",
+                                                    "type": "Expression"
+                                                },
+                                                "deleteFilesAfterCompletion": false
+                                            },
+                                            "formatSettings": {
+                                                "type": "BinaryReadSettings"
+                                            }
+                                        },
+                                        "sink": {
+                                            "type": "BinarySink",
+                                            "storeSettings": {
+                                                "type": "AzureBlobFSWriteSettings",
+                                                "copyBehavior": "PreserveHierarchy"
+                                            }
+                                        },
+                                        "enableStaging": false
+                                    },
+                                    "inputs": [
+                                        {
+                                            "referenceName": "DS_Vetroz_Conso_Source",
+                                            "type": "DatasetReference",
+                                            "parameters": {}
+                                        }
+                                    ],
+                                    "outputs": [
+                                        {
+                                            "referenceName": "DS_Vetroz_Conso_Bronze",
+                                            "type": "DatasetReference",
+                                            "parameters": {
+                                                "p_folder": {
+                                                    "value": "@if(contains(toLower(item().name), 'cons'), 'consumption', \n    if(contains(toLower(item().name), 'temp'), 'temperature', \n        if(contains(toLower(item().name), 'humi'), 'humidity', 'others')\n    )\n)",
+                                                    "type": "Expression"
+                                                }
+                                            }
+                                        }
+                                    ]
+                                }
+                            ]
+                        }
+                    }
+                ],
+                "policy": {
+                    "elapsedTimeMetric": {}
+                },
+                "variables": {
+                    "filename": {
+                        "type": "String"
+                    }
+                },
+                "annotations": [],
+                "lastPublishTime": "2026-03-13T13:39:24Z"
+            },
+            "dependsOn": [
+                "[concat(variables('factoryId'), '/datasets/DS_Vetroz_Conso_Source')]"
+            ]
+        },
+        {
+            "name": "[concat(parameters('factoryName'), '/PL_Bronze_Meteo')]",
+            "type": "Microsoft.DataFactory/factories/pipelines",
+            "apiVersion": "2018-06-01",
+            "properties": {
+                "activities": [
+                    {
+                        "name": "Get Source List",
+                        "type": "GetMetadata",
+                        "dependsOn": [],
+                        "policy": {
+                            "timeout": "0.12:00:00",
+                            "retry": 0,
+                            "retryIntervalInSeconds": 30,
+                            "secureOutput": false,
+                            "secureInput": false
+                        },
+                        "userProperties": [],
+                        "typeProperties": {
+                            "dataset": {
+                                "referenceName": "DS_Vetroz_Meteo_Source",
+                                "type": "DatasetReference",
+                                "parameters": {
+                                    "p_filename": "*"
+                                }
+                            },
+                            "fieldList": [
+                                "childItems"
+                            ],
+                            "storeSettings": {
+                                "type": "SftpReadSettings",
+                                "recursive": true,
+                                "enablePartitionDiscovery": false,
+                                "disableChunking": false
+                            },
+                            "formatSettings": {
+                                "type": "BinaryReadSettings"
+                            }
+                        }
+                    },
+                    {
+                        "name": "Get Destination List",
+                        "type": "GetMetadata",
+                        "dependsOn": [
+                            {
+                                "activity": "Get Source List",
+                                "dependencyConditions": [
+                                    "Succeeded"
+                                ]
+                            }
+                        ],
+                        "policy": {
+                            "timeout": "0.12:00:00",
+                            "retry": 0,
+                            "retryIntervalInSeconds": 30,
+                            "secureOutput": false,
+                            "secureInput": false
+                        },
+                        "userProperties": [],
+                        "typeProperties": {
+                            "dataset": {
+                                "referenceName": "DS_Vetroz_Meteo_Bronze",
+                                "type": "DatasetReference",
+                                "parameters": {}
+                            },
+                            "fieldList": [
+                                "childItems"
+                            ],
+                            "storeSettings": {
+                                "type": "AzureBlobFSReadSettings",
+                                "recursive": true,
+                                "enablePartitionDiscovery": false
+                            },
+                            "formatSettings": {
+                                "type": "BinaryReadSettings"
+                            }
+                        }
+                    },
+                    {
+                        "name": "Keep only new files",
+                        "type": "Filter",
+                        "dependsOn": [
+                            {
+                                "activity": "Get Destination List",
+                                "dependencyConditions": [
+                                    "Succeeded"
+                                ]
+                            }
+                        ],
+                        "userProperties": [],
+                        "typeProperties": {
+                            "items": {
+                                "value": "@activity('Get Source List').output.childItems",
+                                "type": "Expression"
+                            },
+                            "condition": {
+                                "value": "@not(contains(activity('Get Destination List').output.childItems, item()))",
+                                "type": "Expression"
+                            }
+                        }
+                    },
+                    {
+                        "name": "ForEach1",
+                        "type": "ForEach",
+                        "dependsOn": [
+                            {
+                                "activity": "Keep only new files",
+                                "dependencyConditions": [
+                                    "Succeeded"
+                                ]
+                            }
+                        ],
+                        "userProperties": [],
+                        "typeProperties": {
+                            "items": {
+                                "value": "@activity('Keep only new files').output.value",
+                                "type": "Expression"
+                            },
+                            "batchCount": 50,
+                            "activities": [
+                                {
+                                    "name": "Copy data1",
+                                    "type": "Copy",
+                                    "dependsOn": [],
+                                    "policy": {
+                                        "timeout": "0.12:00:00",
+                                        "retry": 0,
+                                        "retryIntervalInSeconds": 30,
+                                        "secureOutput": false,
+                                        "secureInput": false
+                                    },
+                                    "userProperties": [],
+                                    "typeProperties": {
+                                        "source": {
+                                            "type": "BinarySource",
+                                            "storeSettings": {
+                                                "type": "SftpReadSettings",
+                                                "recursive": true,
+                                                "deleteFilesAfterCompletion": false,
+                                                "disableChunking": false
+                                            },
+                                            "formatSettings": {
+                                                "type": "BinaryReadSettings"
+                                            }
+                                        },
+                                        "sink": {
+                                            "type": "BinarySink",
+                                            "storeSettings": {
+                                                "type": "AzureBlobFSWriteSettings",
+                                                "copyBehavior": "PreserveHierarchy"
+                                            }
+                                        },
+                                        "enableStaging": false
+                                    },
+                                    "inputs": [
+                                        {
+                                            "referenceName": "DS_Vetroz_Meteo_Source",
+                                            "type": "DatasetReference",
+                                            "parameters": {
+                                                "p_filename": {
+                                                    "value": "@item().name",
+                                                    "type": "Expression"
+                                                }
+                                            }
+                                        }
+                                    ],
+                                    "outputs": [
+                                        {
+                                            "referenceName": "DS_Vetroz_Meteo_Bronze",
+                                            "type": "DatasetReference",
+                                            "parameters": {}
+                                        }
+                                    ]
+                                }
+                            ]
+                        }
+                    }
+                ],
+                "policy": {
+                    "elapsedTimeMetric": {}
+                },
+                "annotations": [],
+                "lastPublishTime": "2026-03-02T14:35:23Z"
+            },
+            "dependsOn": [
+                "[concat(variables('factoryId'), '/datasets/DS_Vetroz_Meteo_Source')]"
+            ]
+        },
+        {
+            "name": "[concat(parameters('factoryName'), '/PL_Bronze_MeteoFuture')]",
+            "type": "Microsoft.DataFactory/factories/pipelines",
+            "apiVersion": "2018-06-01",
+            "properties": {
+                "activities": [
+                    {
+                        "name": "Get Source List",
+                        "type": "GetMetadata",
+                        "dependsOn": [],
+                        "policy": {
+                            "timeout": "0.12:00:00",
+                            "retry": 0,
+                            "retryIntervalInSeconds": 30,
+                            "secureOutput": false,
+                            "secureInput": false
+                        },
+                        "userProperties": [],
+                        "typeProperties": {
+                            "dataset": {
+                                "referenceName": "DS_Vetroz_FutureForecast_Source",
+                                "type": "DatasetReference",
+                                "parameters": {
+                                    "p_filename": "*"
+                                }
+                            },
+                            "fieldList": [
+                                "childItems"
+                            ],
+                            "storeSettings": {
+                                "type": "SftpReadSettings",
+                                "recursive": true,
+                                "enablePartitionDiscovery": false,
+                                "disableChunking": false
+                            },
+                            "formatSettings": {
+                                "type": "BinaryReadSettings"
+                            }
+                        }
+                    },
+                    {
+                        "name": "Get Destination List",
+                        "type": "GetMetadata",
+                        "dependsOn": [
+                            {
+                                "activity": "Get Source List",
+                                "dependencyConditions": [
+                                    "Succeeded"
+                                ]
+                            }
+                        ],
+                        "policy": {
+                            "timeout": "0.12:00:00",
+                            "retry": 0,
+                            "retryIntervalInSeconds": 30,
+                            "secureOutput": false,
+                            "secureInput": false
+                        },
+                        "userProperties": [],
+                        "typeProperties": {
+                            "dataset": {
+                                "referenceName": "DS_Vetroz_FutureForecasts_Bronze",
+                                "type": "DatasetReference",
+                                "parameters": {}
+                            },
+                            "fieldList": [
+                                "childItems"
+                            ],
+                            "storeSettings": {
+                                "type": "AzureBlobFSReadSettings",
+                                "recursive": true,
+                                "enablePartitionDiscovery": false
+                            },
+                            "formatSettings": {
+                                "type": "BinaryReadSettings"
+                            }
+                        }
+                    },
+                    {
+                        "name": "Keep only new files",
+                        "type": "Filter",
+                        "dependsOn": [
+                            {
+                                "activity": "Get Destination List",
+                                "dependencyConditions": [
+                                    "Succeeded"
+                                ]
+                            }
+                        ],
+                        "userProperties": [],
+                        "typeProperties": {
+                            "items": {
+                                "value": "@activity('Get Source List').output.childItems",
+                                "type": "Expression"
+                            },
+                            "condition": {
+                                "value": "@not(contains(activity('Get Destination List').output.childItems, item()))",
+                                "type": "Expression"
+                            }
+                        }
+                    },
+                    {
+                        "name": "ForEach1",
+                        "type": "ForEach",
+                        "dependsOn": [
+                            {
+                                "activity": "Keep only new files",
+                                "dependencyConditions": [
+                                    "Succeeded"
+                                ]
+                            }
+                        ],
+                        "userProperties": [],
+                        "typeProperties": {
+                            "items": {
+                                "value": "@activity('Keep only new files').output.value",
+                                "type": "Expression"
+                            },
+                            "batchCount": 50,
+                            "activities": [
+                                {
+                                    "name": "Copy data1",
+                                    "type": "Copy",
+                                    "dependsOn": [],
+                                    "policy": {
+                                        "timeout": "0.12:00:00",
+                                        "retry": 0,
+                                        "retryIntervalInSeconds": 30,
+                                        "secureOutput": false,
+                                        "secureInput": false
+                                    },
+                                    "userProperties": [],
+                                    "typeProperties": {
+                                        "source": {
+                                            "type": "BinarySource",
+                                            "storeSettings": {
+                                                "type": "SftpReadSettings",
+                                                "recursive": true,
+                                                "deleteFilesAfterCompletion": false,
+                                                "disableChunking": false
+                                            },
+                                            "formatSettings": {
+                                                "type": "BinaryReadSettings"
+                                            }
+                                        },
+                                        "sink": {
+                                            "type": "BinarySink",
+                                            "storeSettings": {
+                                                "type": "AzureBlobFSWriteSettings",
+                                                "copyBehavior": "PreserveHierarchy"
+                                            }
+                                        },
+                                        "enableStaging": false
+                                    },
+                                    "inputs": [
+                                        {
+                                            "referenceName": "DS_Vetroz_FutureForecast_Source",
+                                            "type": "DatasetReference",
+                                            "parameters": {
+                                                "p_filename": "@item().name"
+                                            }
+                                        }
+                                    ],
+                                    "outputs": [
+                                        {
+                                            "referenceName": "DS_Vetroz_FutureForecasts_Bronze",
+                                            "type": "DatasetReference",
+                                            "parameters": {}
+                                        }
+                                    ]
+                                }
+                            ]
+                        }
+                    }
+                ],
+                "policy": {
+                    "elapsedTimeMetric": {}
+                },
+                "annotations": [],
+                "lastPublishTime": "2026-03-18T09:12:38Z"
+            },
+            "dependsOn": [
+                "[concat(variables('factoryId'), '/datasets/DS_Vetroz_FutureForecast_Source')]"
+            ]
+        },
+        {
+            "name": "[concat(parameters('factoryName'), '/PL_Bronze_Solar')]",
+            "type": "Microsoft.DataFactory/factories/pipelines",
+            "apiVersion": "2018-06-01",
+            "properties": {
+                "activities": [
+                    {
+                        "name": "Get Source List",
+                        "type": "GetMetadata",
+                        "dependsOn": [],
+                        "policy": {
+                            "timeout": "0.12:00:00",
+                            "retry": 0,
+                            "retryIntervalInSeconds": 30,
+                            "secureOutput": false,
+                            "secureInput": false
+                        },
+                        "userProperties": [],
+                        "typeProperties": {
+                            "dataset": {
+                                "referenceName": "DS_Vetroz_Solar_Source",
+                                "type": "DatasetReference",
+                                "parameters": {}
+                            },
+                            "fieldList": [
+                                "childItems"
+                            ],
+                            "storeSettings": {
+                                "type": "FileServerReadSettings",
+                                "recursive": true,
+                                "enablePartitionDiscovery": false
+                            },
+                            "formatSettings": {
+                                "type": "BinaryReadSettings"
+                            }
+                        }
+                    },
+                    {
+                        "name": "Get Destination List",
+                        "type": "GetMetadata",
+                        "dependsOn": [
+                            {
+                                "activity": "Get Source List",
+                                "dependencyConditions": [
+                                    "Succeeded"
+                                ]
+                            }
+                        ],
+                        "policy": {
+                            "timeout": "0.12:00:00",
+                            "retry": 0,
+                            "retryIntervalInSeconds": 30,
+                            "secureOutput": false,
+                            "secureInput": false
+                        },
+                        "userProperties": [],
+                        "typeProperties": {
+                            "dataset": {
+                                "referenceName": "DS_Vetroz_Solar_Bronze",
+                                "type": "DatasetReference",
+                                "parameters": {}
+                            },
+                            "fieldList": [
+                                "childItems"
+                            ],
+                            "storeSettings": {
+                                "type": "AzureBlobFSReadSettings",
+                                "recursive": true,
+                                "enablePartitionDiscovery": false
+                            },
+                            "formatSettings": {
+                                "type": "BinaryReadSettings"
+                            }
+                        }
+                    },
+                    {
+                        "name": "Keep only new files",
+                        "type": "Filter",
+                        "dependsOn": [
+                            {
+                                "activity": "Get Destination List",
+                                "dependencyConditions": [
+                                    "Succeeded"
+                                ]
+                            }
+                        ],
+                        "userProperties": [],
+                        "typeProperties": {
+                            "items": {
+                                "value": "@activity('Get Source List').output.childItems",
+                                "type": "Expression"
+                            },
+                            "condition": {
+                                "value": "@not(contains(activity('Get Destination List').output.childItems, item()))",
+                                "type": "Expression"
+                            }
+                        }
+                    },
+                    {
+                        "name": "ForEach1",
+                        "type": "ForEach",
+                        "dependsOn": [
+                            {
+                                "activity": "Keep only new files",
+                                "dependencyConditions": [
+                                    "Succeeded"
+                                ]
+                            }
+                        ],
+                        "userProperties": [],
+                        "typeProperties": {
+                            "items": {
+                                "value": "@activity('Keep only new files').output.value",
+                                "type": "Expression"
+                            },
+                            "batchCount": 50,
+                            "activities": [
+                                {
+                                    "name": "Copy data1",
+                                    "type": "Copy",
+                                    "dependsOn": [],
+                                    "policy": {
+                                        "timeout": "0.12:00:00",
+                                        "retry": 0,
+                                        "retryIntervalInSeconds": 30,
+                                        "secureOutput": false,
+                                        "secureInput": false
+                                    },
+                                    "userProperties": [],
+                                    "typeProperties": {
+                                        "source": {
+                                            "type": "BinarySource",
+                                            "storeSettings": {
+                                                "type": "FileServerReadSettings",
+                                                "recursive": true,
+                                                "fileFilter": {
+                                                    "value": "@item().name",
+                                                    "type": "Expression"
+                                                },
+                                                "deleteFilesAfterCompletion": false
+                                            },
+                                            "formatSettings": {
+                                                "type": "BinaryReadSettings"
+                                            }
+                                        },
+                                        "sink": {
+                                            "type": "BinarySink",
+                                            "storeSettings": {
+                                                "type": "AzureBlobFSWriteSettings",
+                                                "copyBehavior": "PreserveHierarchy"
+                                            }
+                                        },
+                                        "enableStaging": false
+                                    },
+                                    "inputs": [
+                                        {
+                                            "referenceName": "DS_Vetroz_Solar_Source",
+                                            "type": "DatasetReference",
+                                            "parameters": {}
+                                        }
+                                    ],
+                                    "outputs": [
+                                        {
+                                            "referenceName": "DS_Vetroz_Solar_Bronze",
+                                            "type": "DatasetReference",
+                                            "parameters": {}
+                                        }
+                                    ]
+                                }
+                            ]
+                        }
+                    }
+                ],
+                "policy": {
+                    "elapsedTimeMetric": {}
+                },
+                "annotations": [],
+                "lastPublishTime": "2026-03-02T13:45:11Z"
+            },
+            "dependsOn": [
+                "[concat(variables('factoryId'), '/datasets/DS_Vetroz_Solar_Source')]"
+            ]
+        },
+        {
+            "name": "[concat(parameters('factoryName'), '/TRG_Daily_0930')]",
+            "type": "Microsoft.DataFactory/factories/triggers",
+            "apiVersion": "2018-06-01",
+            "properties": {
+                "annotations": [],
+                "runtimeState": "Started",
+                "pipelines": [
+                    {
+                        "pipelineReference": {
+                            "referenceName": "PL_Upload_Pred_Gold",
+                            "type": "PipelineReference"
+                        },
+                        "parameters": {}
+                    }
+                ],
+                "type": "ScheduleTrigger",
+                "typeProperties": {
+                    "recurrence": {
+                        "frequency": "Day",
+                        "interval": 1,
+                        "startTime": "2026-03-14T09:15:00",
+                        "endTime": "2026-05-09T14:15:00",
+                        "timeZone": "W. Europe Standard Time"
+                    }
+                }
+            },
+            "dependsOn": [
+                "[concat(variables('factoryId'), '/pipelines/PL_Upload_Pred_Gold')]"
+            ]
+        },
+        {
+            "name": "[concat(parameters('factoryName'), '/PL_Ingest_Bronze')]",
+            "type": "Microsoft.DataFactory/factories/pipelines",
+            "apiVersion": "2018-06-01",
+            "properties": {
+                "activities": [
+                    {
+                        "name": "ETL for Silver",
+                        "type": "DatabricksNotebook",
+                        "dependsOn": [
+                            {
+                                "activity": "PL_Conso",
+                                "dependencyConditions": [
+                                    "Succeeded"
+                                ]
+                            }
+                        ],
+                        "policy": {
+                            "timeout": "0.12:00:00",
+                            "retry": 0,
+                            "retryIntervalInSeconds": 30,
+                            "secureOutput": false,
+                            "secureInput": false
+                        },
+                        "userProperties": [],
+                        "typeProperties": {
+                            "notebookPath": "/Users/dylan.sanderso@hes-so.ch/ADF_DataCycleProject/databricks/notebooks/silver_transformation"
+                        },
+                        "linkedServiceName": {
+                            "referenceName": "AzureDatabricks",
+                            "type": "LinkedServiceReference"
+                        }
+                    },
+                    {
+                        "name": "PL_Solar",
+                        "type": "ExecutePipeline",
+                        "dependsOn": [],
+                        "policy": {
+                            "secureInput": false
+                        },
+                        "userProperties": [],
+                        "typeProperties": {
+                            "pipeline": {
+                                "referenceName": "PL_Bronze_Solar",
+                                "type": "PipelineReference"
+                            },
+                            "waitOnCompletion": true,
+                            "parameters": {}
+                        }
+                    },
+                    {
+                        "name": "PL_Bookings",
+                        "type": "ExecutePipeline",
+                        "dependsOn": [
+                            {
+                                "activity": "PL_Solar",
+                                "dependencyConditions": [
+                                    "Succeeded"
+                                ]
+                            }
+                        ],
+                        "policy": {
+                            "secureInput": false
+                        },
+                        "userProperties": [],
+                        "typeProperties": {
+                            "pipeline": {
+                                "referenceName": "PL_Bronze_Bookings",
+                                "type": "PipelineReference"
+                            },
+                            "waitOnCompletion": true,
+                            "parameters": {}
+                        }
+                    },
+                    {
+                        "name": "PL_Meteo",
+                        "type": "ExecutePipeline",
+                        "dependsOn": [
+                            {
+                                "activity": "PL_Bookings",
+                                "dependencyConditions": [
+                                    "Succeeded"
+                                ]
+                            }
+                        ],
+                        "policy": {
+                            "secureInput": false
+                        },
+                        "userProperties": [],
+                        "typeProperties": {
+                            "pipeline": {
+                                "referenceName": "PL_Bronze_Meteo",
+                                "type": "PipelineReference"
+                            },
+                            "waitOnCompletion": true,
+                            "parameters": {}
+                        }
+                    },
+                    {
+                        "name": "PL_Conso",
+                        "type": "ExecutePipeline",
+                        "dependsOn": [
+                            {
+                                "activity": "PL_Meteo",
+                                "dependencyConditions": [
+                                    "Succeeded"
+                                ]
+                            }
+                        ],
+                        "policy": {
+                            "secureInput": false
+                        },
+                        "userProperties": [],
+                        "typeProperties": {
+                            "pipeline": {
+                                "referenceName": "PL_Bronze_Conso",
+                                "type": "PipelineReference"
+                            },
+                            "waitOnCompletion": true,
+                            "parameters": {}
+                        }
+                    },
+                    {
+                        "name": "Populate Fact Gold",
+                        "type": "DatabricksNotebook",
+                        "dependsOn": [
+                            {
+                                "activity": "Populate Dim Gold",
+                                "dependencyConditions": [
+                                    "Succeeded"
+                                ]
+                            }
+                        ],
+                        "policy": {
+                            "timeout": "0.12:00:00",
+                            "retry": 0,
+                            "retryIntervalInSeconds": 30,
+                            "secureOutput": false,
+                            "secureInput": false
+                        },
+                        "userProperties": [],
+                        "typeProperties": {
+                            "notebookPath": "/Users/dylan.sanderso@hes-so.ch/ADF_DataCycleProject/databricks/notebooks/silver_gold_facts"
+                        },
+                        "linkedServiceName": {
+                            "referenceName": "AzureDatabricks",
+                            "type": "LinkedServiceReference"
+                        }
+                    },
+                    {
+                        "name": "Populate Dim Gold",
+                        "type": "DatabricksNotebook",
+                        "dependsOn": [
+                            {
+                                "activity": "ETL for Silver",
+                                "dependencyConditions": [
+                                    "Succeeded"
+                                ]
+                            }
+                        ],
+                        "policy": {
+                            "timeout": "0.12:00:00",
+                            "retry": 0,
+                            "retryIntervalInSeconds": 30,
+                            "secureOutput": false,
+                            "secureInput": false
+                        },
+                        "userProperties": [],
+                        "typeProperties": {
+                            "notebookPath": "/Users/dylan.sanderso@hes-so.ch/ADF_DataCycleProject/databricks/notebooks/silver_gold_dimensions"
+                        },
+                        "linkedServiceName": {
+                            "referenceName": "AzureDatabricks",
+                            "type": "LinkedServiceReference"
+                        }
+                    },
+                    {
+                        "name": "LaunchMLFiles",
+                        "type": "DatabricksNotebook",
+                        "dependsOn": [
+                            {
+                                "activity": "ETL for Silver",
+                                "dependencyConditions": [
+                                    "Succeeded"
+                                ]
+                            }
+                        ],
+                        "policy": {
+                            "timeout": "0.12:00:00",
+                            "retry": 0,
+                            "retryIntervalInSeconds": 30,
+                            "secureOutput": false,
+                            "secureInput": false
+                        },
+                        "userProperties": [],
+                        "typeProperties": {
+                            "notebookPath": "/Users/dylan.sanderso@hes-so.ch/ADF_DataCycleProject/databricks/notebooks/ml_export_to_knime"
+                        },
+                        "linkedServiceName": {
+                            "referenceName": "AzureDatabricks",
+                            "type": "LinkedServiceReference"
+                        }
+                    },
+                    {
+                        "name": "Export_to_SAC",
+                        "type": "ExecutePipeline",
+                        "dependsOn": [
+                            {
+                                "activity": "Populate Fact Gold",
+                                "dependencyConditions": [
+                                    "Succeeded"
+                                ]
+                            }
+                        ],
+                        "policy": {
+                            "secureInput": false
+                        },
+                        "userProperties": [],
+                        "typeProperties": {
+                            "pipeline": {
+                                "referenceName": "PL_SAC_Export",
+                                "type": "PipelineReference"
+                            },
+                            "waitOnCompletion": true,
+                            "parameters": {}
+                        }
+                    }
+                ],
+                "policy": {
+                    "elapsedTimeMetric": {}
+                },
+                "annotations": [],
+                "lastPublishTime": "2026-03-20T07:59:25Z"
+            },
+            "dependsOn": [
+                "[concat(variables('factoryId'), '/linkedServices/AzureDatabricks')]",
+                "[concat(variables('factoryId'), '/pipelines/PL_Bronze_Solar')]",
+                "[concat(variables('factoryId'), '/pipelines/PL_Bronze_Bookings')]",
+                "[concat(variables('factoryId'), '/pipelines/PL_Bronze_Meteo')]",
+                "[concat(variables('factoryId'), '/pipelines/PL_Bronze_Conso')]",
+                "[concat(variables('factoryId'), '/pipelines/PL_SAC_Export')]"
+            ]
+        }
+    ]
+}

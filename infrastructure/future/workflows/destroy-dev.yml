@@ -1,0 +1,65 @@
+name: Destroy (dev)
+
+# Tears the dev environment down to $0 cost. Requires explicit confirmation
+# text "DESTROY" to guard against accidental invocation.
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type DESTROY to confirm'
+        required: true
+        default: ''
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: destroy-dev
+  cancel-in-progress: false
+
+jobs:
+  destroy:
+    name: Delete dev resource groups
+    runs-on: ubuntu-latest
+    environment: dev
+    steps:
+      - name: Validate confirmation
+        run: |
+          if [ "${{ github.event.inputs.confirm }}" != "DESTROY" ]; then
+            echo "::error::confirm input must be exactly 'DESTROY' (got '${{ github.event.inputs.confirm }}')"
+            exit 1
+          fi
+
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Delete project resource group
+        run: |
+          az group delete --name datacycle-rg-dev --yes --no-wait || true
+
+      - name: Delete Databricks managed resource group
+        run: |
+          az group delete --name databricks-rg-datacycle-dev --yes --no-wait || true
+
+      - name: Purge soft-deleted Key Vault
+        run: |
+          az keyvault purge --name kv-datacycle-dev --location switzerlandnorth || \
+            echo "KV purge skipped (either not soft-deleted yet or already purged)"
+
+      - name: Summary
+        run: |
+          {
+            echo "## Teardown triggered"
+            echo ""
+            echo "- \`datacycle-rg-dev\` — delete issued (async)"
+            echo "- \`databricks-rg-datacycle-dev\` — delete issued (async)"
+            echo "- \`kv-datacycle-dev\` — purge attempted"
+            echo ""
+            echo "Use \`az group show -n datacycle-rg-dev\` to confirm deletion completes."
+          } >> "$GITHUB_STEP_SUMMARY"
