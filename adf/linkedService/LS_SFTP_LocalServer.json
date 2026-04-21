@@ -1,0 +1,27 @@
+{
+	"name": "LS_SFTP_LocalServer",
+	"type": "Microsoft.DataFactory/factories/linkedservices",
+	"properties": {
+		"annotations": [],
+		"type": "Sftp",
+		"typeProperties": {
+			"host": "10.130.25.152",
+			"port": 22,
+			"skipHostKeyValidation": true,
+			"authenticationType": "Basic",
+			"userName": "Student",
+			"password": {
+				"type": "AzureKeyVaultSecret",
+				"store": {
+					"referenceName": "LS_AKV",
+					"type": "LinkedServiceReference"
+				},
+				"secretName": "Student-VM-Password"
+			}
+		},
+		"connectVia": {
+			"referenceName": "Group3-VM-Runtime",
+			"type": "IntegrationRuntimeReference"
+		}
+	}
+}
