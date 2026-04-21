@@ -1,0 +1,39 @@
+{
+	"name": "AzureSqlTable5",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "LS_AzureSQL_Gold",
+			"type": "LinkedServiceReference"
+		},
+		"annotations": [],
+		"type": "AzureSqlTable",
+		"schema": [
+			{
+				"name": "FactKey",
+				"type": "int",
+				"precision": 10
+			},
+			{
+				"name": "timestamp",
+				"type": "datetime",
+				"precision": 23,
+				"scale": 3
+			},
+			{
+				"name": "actual_humidity",
+				"type": "float",
+				"precision": 15
+			},
+			{
+				"name": "humidity_variation",
+				"type": "float",
+				"precision": 15
+			}
+		],
+		"typeProperties": {
+			"schema": "dbo",
+			"table": "Fact_Humidity"
+		}
+	},
+	"type": "Microsoft.DataFactory/factories/datasets"
+}
