@@ -1,0 +1,42 @@
+{
+	"name": "Parquet1",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "LS_ADLS_Bronze",
+			"type": "LinkedServiceReference"
+		},
+		"annotations": [],
+		"type": "Parquet",
+		"typeProperties": {
+			"location": {
+				"type": "AzureBlobFSLocation",
+				"folderPath": "solar_inverters",
+				"fileSystem": "silver"
+			},
+			"compressionCodec": "snappy"
+		},
+		"schema": [
+			{
+				"name": "log_timestamp",
+				"type": "INT96"
+			},
+			{
+				"name": "inverter_id",
+				"type": "INT_32"
+			},
+			{
+				"name": "ac_power_w",
+				"type": "INT_32"
+			},
+			{
+				"name": "status_code",
+				"type": "INT_32"
+			},
+			{
+				"name": "is_failure",
+				"type": "BOOLEAN"
+			}
+		]
+	},
+	"type": "Microsoft.DataFactory/factories/datasets"
+}
