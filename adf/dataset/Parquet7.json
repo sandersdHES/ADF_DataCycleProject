@@ -1,0 +1,43 @@
+{
+	"name": "Parquet7",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "LS_ADLS_Bronze",
+			"type": "LinkedServiceReference"
+		},
+		"annotations": [],
+		"type": "Parquet",
+		"typeProperties": {
+			"location": {
+				"type": "AzureBlobFSLocation",
+				"folderPath": "bookings",
+				"fileSystem": "silver"
+			},
+			"compressionCodec": "snappy"
+		},
+		"schema": [
+			{"name": "Nom", "type": "UTF8"},
+			{"name": "Nom entier", "type": "UTF8"},
+			{"name": "Date", "type": "UTF8"},
+			{"name": "Date de début3", "type": "UTF8"},
+			{"name": "Date de fin4", "type": "UTF8"},
+			{"name": "Rés.-no", "type": "UTF8"},
+			{"name": "Type de réservation", "type": "UTF8"},
+			{"name": "Codes", "type": "UTF8"},
+			{"name": "Sigle de la salle remplacée", "type": "UTF8"},
+			{"name": "Nom entier de la salle remplacée", "type": "UTF8"},
+			{"name": "Date de début11", "type": "UTF8"},
+			{"name": "Date de fin12", "type": "UTF8"},
+			{"name": "Périodicité", "type": "UTF8"},
+			{"name": "Classe", "type": "UTF8"},
+			{"name": "Activité", "type": "UTF8"},
+			{"name": "Division", "type": "UTF8"},
+			{"name": "Poste de dépenses", "type": "UTF8"},
+			{"name": "Remarque", "type": "UTF8"},
+			{"name": "Annotation", "type": "UTF8"},
+			{"name": "Professeur_Masked", "type": "UTF8"},
+			{"name": "Utilisateur_Masked", "type": "UTF8"}
+		]
+	},
+	"type": "Microsoft.DataFactory/factories/datasets"
+}
