@@ -1,0 +1,222 @@
+{
+	"$schema": "http://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+	"contentVersion": "1.0.0.0",
+	"parameters": {
+		"factoryName": {
+			"type": "string",
+			"metadata": "Nom de fabrique de données",
+			"defaultValue": "group3-df"
+		},
+		"LS_ADLS_Bronze_accountKey": {
+			"type": "secureString",
+			"metadata": "Chaîne sécurisée pour « accountKey » de « LS_ADLS_Bronze »"
+		},
+		"LS_AzureFileShare_SAC_connectionString": {
+			"type": "secureString",
+			"metadata": "Chaîne sécurisée pour « connectionString » de « LS_AzureFileShare_SAC »"
+		},
+		"LS_Databricks_Silver_accessToken": {
+			"type": "secureString",
+			"metadata": "Chaîne sécurisée pour « accessToken » de « LS_Databricks_Silver »"
+		},
+		"AzureDatabricks_properties_typeProperties_existingClusterId": {
+			"type": "string",
+			"defaultValue": "0223-115927-nvtos4a4"
+		},
+		"LS_ADLS_Bronze_properties_typeProperties_url": {
+			"type": "string",
+			"defaultValue": "https://adlsbellevuegrp3.dfs.core.windows.net/"
+		},
+		"LS_AKV_properties_typeProperties_baseUrl": {
+			"type": "string",
+			"defaultValue": "https://DataCycleGroup3Keys.vault.azure.net/"
+		},
+		"LS_AzureSQL_Gold_properties_typeProperties_server": {
+			"type": "string",
+			"defaultValue": "sqlserver-bellevue-grp3.database.windows.net"
+		},
+		"LS_AzureSQL_Gold_properties_typeProperties_database": {
+			"type": "string",
+			"defaultValue": "sqldb-bellevue-gold"
+		},
+		"LS_AzureSQL_Gold_properties_typeProperties_userName": {
+			"type": "string",
+			"defaultValue": "dylan.sanderso"
+		},
+		"LS_BellevueBooking_LocalServer_properties_typeProperties_host": {
+			"type": "string",
+			"defaultValue": "\\\\10.130.25.152\\BellevueBooking"
+		},
+		"LS_BellevueBooking_LocalServer_properties_typeProperties_userId": {
+			"type": "string",
+			"defaultValue": "Student"
+		},
+		"LS_BellevueConso_LocalServer_properties_typeProperties_host": {
+			"type": "string",
+			"defaultValue": "\\\\10.130.25.152\\BellevueConso"
+		},
+		"LS_BellevueConso_LocalServer_properties_typeProperties_userId": {
+			"type": "string",
+			"defaultValue": "Student"
+		},
+		"LS_DevDB_Gold_properties_typeProperties_server": {
+			"type": "string",
+			"defaultValue": "sqlserver-bellevue-grp3.database.windows.net"
+		},
+		"LS_DevDB_Gold_properties_typeProperties_database": {
+			"type": "string",
+			"defaultValue": "DevDB"
+		},
+		"LS_DevDB_Gold_properties_typeProperties_userName": {
+			"type": "string",
+			"defaultValue": "dylan.sanderso"
+		},
+		"LS_SFTP_LocalServer_properties_typeProperties_host": {
+			"type": "string",
+			"defaultValue": "10.130.25.152"
+		},
+		"LS_SFTP_LocalServer_properties_typeProperties_userName": {
+			"type": "string",
+			"defaultValue": "Student"
+		},
+		"LS_Solarlogs_LocalServer_properties_typeProperties_host": {
+			"type": "string",
+			"defaultValue": "\\\\10.130.25.152\\Solarlogs"
+		},
+		"LS_Solarlogs_LocalServer_properties_typeProperties_userId": {
+			"type": "string",
+			"defaultValue": "Student"
+		},
+		"containerUri": {
+			"type": "string",
+			"metadata": "URI pour le compte de stockage contenant des modèles ARM liés"
+		},
+		"containerSasToken": {
+			"type": "string",
+			"metadata": "Jeton SAS pour le compte de stockage contenant des modèles ARM liés"
+		}
+	},
+	"variables": {
+		"factoryId": "[concat('Microsoft.DataFactory/factories/', parameters('factoryName'))]"
+	},
+	"resources": [
+		{
+			"name": "group3-df_ArmTemplate_0",
+			"type": "Microsoft.Resources/deployments",
+			"apiVersion": "2024-03-01",
+			"properties": {
+				"mode": "incremental",
+				"templateLink": {
+					"uri": "[concat(parameters('containerUri'), '/ArmTemplate_0.json', parameters('containerSasToken'))]",
+					"contentVersion": "1.0.0.0"
+				},
+				"parameters": {
+					"factoryName": {
+						"value": "[parameters('factoryName')]"
+					},
+					"LS_ADLS_Bronze_accountKey": {
+						"value": "[parameters('LS_ADLS_Bronze_accountKey')]"
+					},
+					"LS_AzureFileShare_SAC_connectionString": {
+						"value": "[parameters('LS_AzureFileShare_SAC_connectionString')]"
+					},
+					"LS_Databricks_Silver_accessToken": {
+						"value": "[parameters('LS_Databricks_Silver_accessToken')]"
+					},
+					"LS_ADLS_Bronze_properties_typeProperties_url": {
+						"value": "[parameters('LS_ADLS_Bronze_properties_typeProperties_url')]"
+					},
+					"LS_AKV_properties_typeProperties_baseUrl": {
+						"value": "[parameters('LS_AKV_properties_typeProperties_baseUrl')]"
+					}
+				}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "group3-df_ArmTemplate_1",
+			"type": "Microsoft.Resources/deployments",
+			"apiVersion": "2024-03-01",
+			"properties": {
+				"mode": "incremental",
+				"templateLink": {
+					"uri": "[concat(parameters('containerUri'), '/ArmTemplate_1.json', parameters('containerSasToken'))]",
+					"contentVersion": "1.0.0.0"
+				},
+				"parameters": {
+					"factoryName": {
+						"value": "[parameters('factoryName')]"
+					},
+					"AzureDatabricks_properties_typeProperties_existingClusterId": {
+						"value": "[parameters('AzureDatabricks_properties_typeProperties_existingClusterId')]"
+					},
+					"LS_AzureSQL_Gold_properties_typeProperties_server": {
+						"value": "[parameters('LS_AzureSQL_Gold_properties_typeProperties_server')]"
+					},
+					"LS_AzureSQL_Gold_properties_typeProperties_database": {
+						"value": "[parameters('LS_AzureSQL_Gold_properties_typeProperties_database')]"
+					},
+					"LS_AzureSQL_Gold_properties_typeProperties_userName": {
+						"value": "[parameters('LS_AzureSQL_Gold_properties_typeProperties_userName')]"
+					},
+					"LS_BellevueBooking_LocalServer_properties_typeProperties_host": {
+						"value": "[parameters('LS_BellevueBooking_LocalServer_properties_typeProperties_host')]"
+					},
+					"LS_BellevueBooking_LocalServer_properties_typeProperties_userId": {
+						"value": "[parameters('LS_BellevueBooking_LocalServer_properties_typeProperties_userId')]"
+					},
+					"LS_BellevueConso_LocalServer_properties_typeProperties_host": {
+						"value": "[parameters('LS_BellevueConso_LocalServer_properties_typeProperties_host')]"
+					},
+					"LS_BellevueConso_LocalServer_properties_typeProperties_userId": {
+						"value": "[parameters('LS_BellevueConso_LocalServer_properties_typeProperties_userId')]"
+					},
+					"LS_DevDB_Gold_properties_typeProperties_server": {
+						"value": "[parameters('LS_DevDB_Gold_properties_typeProperties_server')]"
+					},
+					"LS_DevDB_Gold_properties_typeProperties_database": {
+						"value": "[parameters('LS_DevDB_Gold_properties_typeProperties_database')]"
+					},
+					"LS_DevDB_Gold_properties_typeProperties_userName": {
+						"value": "[parameters('LS_DevDB_Gold_properties_typeProperties_userName')]"
+					},
+					"LS_SFTP_LocalServer_properties_typeProperties_host": {
+						"value": "[parameters('LS_SFTP_LocalServer_properties_typeProperties_host')]"
+					},
+					"LS_SFTP_LocalServer_properties_typeProperties_userName": {
+						"value": "[parameters('LS_SFTP_LocalServer_properties_typeProperties_userName')]"
+					},
+					"LS_Solarlogs_LocalServer_properties_typeProperties_host": {
+						"value": "[parameters('LS_Solarlogs_LocalServer_properties_typeProperties_host')]"
+					},
+					"LS_Solarlogs_LocalServer_properties_typeProperties_userId": {
+						"value": "[parameters('LS_Solarlogs_LocalServer_properties_typeProperties_userId')]"
+					}
+				}
+			},
+			"dependsOn": [
+				"[resourceId('Microsoft.Resources/deployments', 'group3-df_ArmTemplate_0')]"
+			]
+		},
+		{
+			"name": "group3-df_ArmTemplate_2",
+			"type": "Microsoft.Resources/deployments",
+			"apiVersion": "2024-03-01",
+			"properties": {
+				"mode": "incremental",
+				"templateLink": {
+					"uri": "[concat(parameters('containerUri'), '/ArmTemplate_2.json', parameters('containerSasToken'))]",
+					"contentVersion": "1.0.0.0"
+				},
+				"parameters": {
+					"factoryName": {
+						"value": "[parameters('factoryName')]"
+					}
+				}
+			},
+			"dependsOn": [
+				"[resourceId('Microsoft.Resources/deployments', 'group3-df_ArmTemplate_1')]"
+			]
+		}
+	]
+}
