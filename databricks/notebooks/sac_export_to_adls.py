@@ -67,8 +67,11 @@ df_combined = spark.read.jdbc(
         "    s.InverterID, s.InverterName, "
         "    s.StatusCode, s.StatusLabel, s.StatusCategory, "
         "    s.IsFailure, s.ReadingCount, "
-        "    CAST(ROUND(s.PctOfDayReadings, 2)    AS DECIMAL(6,2)) AS PctOfDayReadings, "
-        "    CAST(ROUND(p.AvgPerformanceRatio, 4) AS DECIMAL(8,4)) AS AvgPerformanceRatio, "
+        "    CASE WHEN s.IsFailure = 1 THEN s.ReadingCount ELSE 0 END AS FailureReadingCount, "
+        "    CAST(ROUND(s.PctOfDayReadings, 2) AS DECIMAL(6,2)) AS PctOfDayReadings, "
+        "    CASE WHEN s.StatusCategory = 'OK' "
+        "         THEN CAST(ROUND(p.AvgPerformanceRatio, 4) AS DECIMAL(8,4)) "
+        "         ELSE NULL END AS AvgPerformanceRatio, "
         "    p.HadFailureToday "
         "FROM dbo.vw_inverter_status_breakdown s "
         "LEFT JOIN ( "
@@ -81,10 +84,9 @@ df_combined = spark.read.jdbc(
     ),
     properties = jdbc_props,
 )
-
+ 
 n_combined = df_combined.count()
 print(f"✅ Combined (status + performance) : {n_combined:,} rows")
-display(df_combined)
 
 # COMMAND ----------
 
