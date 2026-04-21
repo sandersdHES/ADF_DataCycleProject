@@ -22,7 +22,7 @@
 				},
 				"userProperties": [],
 				"typeProperties": {
-					"notebookPath": "/Users/dylan.sanderso@hes-so.ch/ADF_Databricks.git/silver_transformation"
+					"notebookPath": "/Repos/dylan.sanderso@hes-so.ch/ADF_DataCycleProject/databricks/notebooks/silver_transformation"
 				},
 				"linkedServiceName": {
 					"referenceName": "AzureDatabricks",
@@ -134,7 +134,7 @@
 				},
 				"userProperties": [],
 				"typeProperties": {
-					"notebookPath": "/Users/dylan.sanderso@hes-so.ch/ADF_Databricks.git/silver_gold_facts"
+					"notebookPath": "/Repos/dylan.sanderso@hes-so.ch/ADF_DataCycleProject/databricks/notebooks/silver_gold_facts"
 				},
 				"linkedServiceName": {
 					"referenceName": "AzureDatabricks",
@@ -161,7 +161,7 @@
 				},
 				"userProperties": [],
 				"typeProperties": {
-					"notebookPath": "/Users/dylan.sanderso@hes-so.ch/ADF_Databricks.git/silver_gold_dimensions"
+					"notebookPath": "/Repos/dylan.sanderso@hes-so.ch/ADF_DataCycleProject/databricks/notebooks/silver_gold_dimensions"
 				},
 				"linkedServiceName": {
 					"referenceName": "AzureDatabricks",
@@ -188,7 +188,7 @@
 				},
 				"userProperties": [],
 				"typeProperties": {
-					"notebookPath": "/Users/dylan.sanderso@hes-so.ch/ADF_Databricks.git/ml_export_to_knime"
+					"notebookPath": "/Repos/dylan.sanderso@hes-so.ch/ADF_DataCycleProject/databricks/notebooks/ml_export_to_knime"
 				},
 				"linkedServiceName": {
 					"referenceName": "AzureDatabricks",

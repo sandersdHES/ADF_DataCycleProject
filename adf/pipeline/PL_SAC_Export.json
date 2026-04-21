@@ -15,7 +15,7 @@
 				},
 				"userProperties": [],
 				"typeProperties": {
-					"notebookPath": "/Users/dylan.sanderso@hes-so.ch/ADF_Databricks.git/sac_export_to_adls"
+					"notebookPath": "/Repos/dylan.sanderso@hes-so.ch/ADF_DataCycleProject/databricks/notebooks/sac_export_to_adls"
 				},
 				"linkedServiceName": {
 					"referenceName": "AzureDatabricks",

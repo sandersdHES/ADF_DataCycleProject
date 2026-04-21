@@ -22,7 +22,7 @@
 				},
 				"userProperties": [],
 				"typeProperties": {
-					"notebookPath": "/Users/dylan.sanderso@hes-so.ch/ADF_Databricks.git/ml_load_predictions"
+					"notebookPath": "/Repos/dylan.sanderso@hes-so.ch/ADF_DataCycleProject/databricks/notebooks/ml_load_predictions"
 				},
 				"linkedServiceName": {
 					"referenceName": "AzureDatabricks",
