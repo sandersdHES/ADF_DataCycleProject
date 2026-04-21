@@ -1,0 +1,51 @@
+{
+	"name": "AzureSqlTable6",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "LS_AzureSQL_Gold",
+			"type": "LinkedServiceReference"
+		},
+		"annotations": [],
+		"type": "AzureSqlTable",
+		"schema": [
+			{
+				"name": "FactKey",
+				"type": "int",
+				"precision": 10
+			},
+			{
+				"name": "Time",
+				"type": "datetime",
+				"precision": 23,
+				"scale": 3
+			},
+			{
+				"name": "Site",
+				"type": "nvarchar"
+			},
+			{
+				"name": "Measurement",
+				"type": "nvarchar"
+			},
+			{
+				"name": "Prediction",
+				"type": "float",
+				"precision": 15
+			},
+			{
+				"name": "Unit",
+				"type": "nvarchar"
+			},
+			{
+				"name": "Value",
+				"type": "float",
+				"precision": 15
+			}
+		],
+		"typeProperties": {
+			"schema": "dbo",
+			"table": "Fact_WeatherForecast"
+		}
+	},
+	"type": "Microsoft.DataFactory/factories/datasets"
+}
