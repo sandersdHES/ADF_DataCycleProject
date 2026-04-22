@@ -23,15 +23,6 @@
 		"LS_AKV_properties_typeProperties_baseUrl": {
 			"value": "https://DataCycleGroup3Keys.vault.azure.net/"
 		},
-		"LS_AzureSQL_Gold_properties_typeProperties_server": {
-			"value": "sqlserver-bellevue-grp3.database.windows.net"
-		},
-		"LS_AzureSQL_Gold_properties_typeProperties_database": {
-			"value": "sqldb-bellevue-gold"
-		},
-		"LS_AzureSQL_Gold_properties_typeProperties_userName": {
-			"value": "dylan.sanderso"
-		},
 		"LS_BellevueBooking_LocalServer_properties_typeProperties_host": {
 			"value": "\\\\10.130.25.152\\BellevueBooking"
 		},

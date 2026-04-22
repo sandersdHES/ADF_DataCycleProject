@@ -31,18 +31,6 @@
 			"type": "string",
 			"defaultValue": "https://DataCycleGroup3Keys.vault.azure.net/"
 		},
-		"LS_AzureSQL_Gold_properties_typeProperties_server": {
-			"type": "string",
-			"defaultValue": "sqlserver-bellevue-grp3.database.windows.net"
-		},
-		"LS_AzureSQL_Gold_properties_typeProperties_database": {
-			"type": "string",
-			"defaultValue": "sqldb-bellevue-gold"
-		},
-		"LS_AzureSQL_Gold_properties_typeProperties_userName": {
-			"type": "string",
-			"defaultValue": "dylan.sanderso"
-		},
 		"LS_BellevueBooking_LocalServer_properties_typeProperties_host": {
 			"type": "string",
 			"defaultValue": "\\\\10.130.25.152\\BellevueBooking"
@@ -1057,7 +1045,7 @@
 						},
 						"userProperties": [],
 						"typeProperties": {
-							"notebookPath": "/Users/dylan.sanderso@hes-so.ch/silver_transformation"
+							"notebookPath": "/Users/dylan.sanderso@hes-so.ch/ADF_DataCycleProject/databricks/notebooks/silver_transformation"
 						},
 						"linkedServiceName": {
 							"referenceName": "AzureDatabricks",
@@ -1173,7 +1161,7 @@
 						},
 						"userProperties": [],
 						"typeProperties": {
-							"notebookPath": "/Users/dylan.sanderso@hes-so.ch/silver_gold_facts"
+							"notebookPath": "/Users/dylan.sanderso@hes-so.ch/ADF_DataCycleProject/databricks/notebooks/silver_gold_facts"
 						},
 						"linkedServiceName": {
 							"referenceName": "AzureDatabricks",
@@ -1200,7 +1188,7 @@
 						},
 						"userProperties": [],
 						"typeProperties": {
-							"notebookPath": "/Users/dylan.sanderso@hes-so.ch/silver_gold_dimensions"
+							"notebookPath": "/Users/dylan.sanderso@hes-so.ch/ADF_DataCycleProject/databricks/notebooks/silver_gold_dimensions"
 						},
 						"linkedServiceName": {
 							"referenceName": "AzureDatabricks",
@@ -1227,7 +1215,7 @@
 						},
 						"userProperties": [],
 						"typeProperties": {
-							"notebookPath": "/Users/dylan.sanderso@hes-so.ch/ml_export_to_knime"
+							"notebookPath": "/Users/dylan.sanderso@hes-so.ch/ADF_DataCycleProject/databricks/notebooks/ml_export_to_knime"
 						},
 						"linkedServiceName": {
 							"referenceName": "AzureDatabricks",
@@ -1293,7 +1281,7 @@
 						},
 						"userProperties": [],
 						"typeProperties": {
-							"notebookPath": "/Users/dylan.sanderso@hes-so.ch/sac_export_to_adls"
+							"notebookPath": "/Users/dylan.sanderso@hes-so.ch/ADF_DataCycleProject/databricks/notebooks/sac_export_to_adls"
 						},
 						"linkedServiceName": {
 							"referenceName": "AzureDatabricks",
@@ -1395,7 +1383,7 @@
 						},
 						"userProperties": [],
 						"typeProperties": {
-							"notebookPath": "/Users/dylan.sanderso@hes-so.ch/ml_load_predictions"
+							"notebookPath": "/Users/dylan.sanderso@hes-so.ch/ADF_DataCycleProject/databricks/notebooks/ml_load_predictions"
 						},
 						"linkedServiceName": {
 							"referenceName": "AzureDatabricks",
@@ -1613,317 +1601,6 @@
 			},
 			"dependsOn": [
 				"[concat(variables('factoryId'), '/linkedServices/LS_AKV')]"
-			]
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/AzureSqlTable1')]",
-			"type": "Microsoft.DataFactory/factories/datasets",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"linkedServiceName": {
-					"referenceName": "LS_AzureSQL_Gold",
-					"type": "LinkedServiceReference"
-				},
-				"annotations": [],
-				"type": "AzureSqlTable",
-				"schema": [
-					{
-						"name": "log_timestamp",
-						"type": "datetime",
-						"precision": 23,
-						"scale": 3
-					},
-					{
-						"name": "InverterID",
-						"type": "int",
-						"precision": 10
-					},
-					{
-						"name": "ac_power_w",
-						"type": "float",
-						"precision": 15
-					},
-					{
-						"name": "status_code",
-						"type": "int",
-						"precision": 10
-					}
-				],
-				"typeProperties": {
-					"schema": "dbo",
-					"table": "Fact_SolarHardware"
-				}
-			},
-			"dependsOn": [
-				"[concat(variables('factoryId'), '/linkedServices/LS_AzureSQL_Gold')]"
-			]
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/AzureSqlTable2')]",
-			"type": "Microsoft.DataFactory/factories/datasets",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"linkedServiceName": {
-					"referenceName": "LS_AzureSQL_Gold",
-					"type": "LinkedServiceReference"
-				},
-				"annotations": [],
-				"type": "AzureSqlTable",
-				"schema": [
-					{
-						"name": "timestamp",
-						"type": "datetime",
-						"precision": 23,
-						"scale": 3
-					},
-					{
-						"name": "cumulative_reading",
-						"type": "float",
-						"precision": 15
-					},
-					{
-						"name": "delta_value",
-						"type": "float",
-						"precision": 15
-					}
-				],
-				"typeProperties": {
-					"schema": "dbo",
-					"table": "Fact_SolarAggregated"
-				}
-			},
-			"dependsOn": [
-				"[concat(variables('factoryId'), '/linkedServices/LS_AzureSQL_Gold')]"
-			]
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/AzureSqlTable3')]",
-			"type": "Microsoft.DataFactory/factories/datasets",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"linkedServiceName": {
-					"referenceName": "LS_AzureSQL_Gold",
-					"type": "LinkedServiceReference"
-				},
-				"annotations": [],
-				"type": "AzureSqlTable",
-				"schema": [
-					{
-						"name": "timestamp",
-						"type": "datetime",
-						"precision": 23,
-						"scale": 3
-					},
-					{
-						"name": "cumulative_reading",
-						"type": "float",
-						"precision": 15
-					},
-					{
-						"name": "delta_value",
-						"type": "float",
-						"precision": 15
-					}
-				],
-				"typeProperties": {
-					"schema": "dbo",
-					"table": "Fact_EnergyConsumption"
-				}
-			},
-			"dependsOn": [
-				"[concat(variables('factoryId'), '/linkedServices/LS_AzureSQL_Gold')]"
-			]
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/AzureSqlTable4')]",
-			"type": "Microsoft.DataFactory/factories/datasets",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"linkedServiceName": {
-					"referenceName": "LS_AzureSQL_Gold",
-					"type": "LinkedServiceReference"
-				},
-				"annotations": [],
-				"type": "AzureSqlTable",
-				"schema": [
-					{
-						"name": "FactKey",
-						"type": "int",
-						"precision": 10
-					},
-					{
-						"name": "timestamp",
-						"type": "datetime",
-						"precision": 23,
-						"scale": 3
-					},
-					{
-						"name": "actual_temp",
-						"type": "float",
-						"precision": 15
-					},
-					{
-						"name": "temp_variation",
-						"type": "float",
-						"precision": 15
-					}
-				],
-				"typeProperties": {
-					"schema": "dbo",
-					"table": "Fact_Temperature"
-				}
-			},
-			"dependsOn": [
-				"[concat(variables('factoryId'), '/linkedServices/LS_AzureSQL_Gold')]"
-			]
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/AzureSqlTable5')]",
-			"type": "Microsoft.DataFactory/factories/datasets",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"linkedServiceName": {
-					"referenceName": "LS_AzureSQL_Gold",
-					"type": "LinkedServiceReference"
-				},
-				"annotations": [],
-				"type": "AzureSqlTable",
-				"schema": [
-					{
-						"name": "FactKey",
-						"type": "int",
-						"precision": 10
-					},
-					{
-						"name": "timestamp",
-						"type": "datetime",
-						"precision": 23,
-						"scale": 3
-					},
-					{
-						"name": "actual_humidity",
-						"type": "float",
-						"precision": 15
-					},
-					{
-						"name": "humidity_variation",
-						"type": "float",
-						"precision": 15
-					}
-				],
-				"typeProperties": {
-					"schema": "dbo",
-					"table": "Fact_Humidity"
-				}
-			},
-			"dependsOn": [
-				"[concat(variables('factoryId'), '/linkedServices/LS_AzureSQL_Gold')]"
-			]
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/AzureSqlTable6')]",
-			"type": "Microsoft.DataFactory/factories/datasets",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"linkedServiceName": {
-					"referenceName": "LS_AzureSQL_Gold",
-					"type": "LinkedServiceReference"
-				},
-				"annotations": [],
-				"type": "AzureSqlTable",
-				"schema": [
-					{
-						"name": "FactKey",
-						"type": "int",
-						"precision": 10
-					},
-					{
-						"name": "Time",
-						"type": "datetime",
-						"precision": 23,
-						"scale": 3
-					},
-					{
-						"name": "Site",
-						"type": "nvarchar"
-					},
-					{
-						"name": "Measurement",
-						"type": "nvarchar"
-					},
-					{
-						"name": "Prediction",
-						"type": "float",
-						"precision": 15
-					},
-					{
-						"name": "Unit",
-						"type": "nvarchar"
-					},
-					{
-						"name": "Value",
-						"type": "float",
-						"precision": 15
-					}
-				],
-				"typeProperties": {
-					"schema": "dbo",
-					"table": "Fact_WeatherForecast"
-				}
-			},
-			"dependsOn": [
-				"[concat(variables('factoryId'), '/linkedServices/LS_AzureSQL_Gold')]"
-			]
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/AzureSqlTable7')]",
-			"type": "Microsoft.DataFactory/factories/datasets",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"linkedServiceName": {
-					"referenceName": "LS_AzureSQL_Gold",
-					"type": "LinkedServiceReference"
-				},
-				"annotations": [],
-				"type": "AzureSqlTable",
-				"schema": [
-					{
-						"name": "FactKey",
-						"type": "int",
-						"precision": 10
-					},
-					{
-						"name": "Room",
-						"type": "nvarchar"
-					},
-					{
-						"name": "Booking_Date",
-						"type": "nvarchar"
-					},
-					{
-						"name": "Start_Time",
-						"type": "nvarchar"
-					},
-					{
-						"name": "End_Time",
-						"type": "nvarchar"
-					},
-					{
-						"name": "Professeur_Masked",
-						"type": "nvarchar"
-					},
-					{
-						"name": "Utilisateur_Masked",
-						"type": "nvarchar"
-					}
-				],
-				"typeProperties": {
-					"schema": "dbo",
-					"table": "Fact_Bookings"
-				}
-			},
-			"dependsOn": [
-				"[concat(variables('factoryId'), '/linkedServices/LS_AzureSQL_Gold')]"
 			]
 		},
 		{
@@ -2639,34 +2316,6 @@
 				}
 			},
 			"dependsOn": []
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/LS_AzureSQL_Gold')]",
-			"type": "Microsoft.DataFactory/factories/linkedServices",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"annotations": [],
-				"type": "AzureSqlDatabase",
-				"typeProperties": {
-					"server": "[parameters('LS_AzureSQL_Gold_properties_typeProperties_server')]",
-					"database": "[parameters('LS_AzureSQL_Gold_properties_typeProperties_database')]",
-					"encrypt": "mandatory",
-					"trustServerCertificate": false,
-					"authenticationType": "SQL",
-					"userName": "[parameters('LS_AzureSQL_Gold_properties_typeProperties_userName')]",
-					"password": {
-						"type": "AzureKeyVaultSecret",
-						"store": {
-							"referenceName": "LS_AKV",
-							"type": "LinkedServiceReference"
-						},
-						"secretName": "Admin-SQL-Password"
-					}
-				}
-			},
-			"dependsOn": [
-				"[concat(variables('factoryId'), '/linkedServices/LS_AKV')]"
-			]
 		},
 		{
 			"name": "[concat(parameters('factoryName'), '/LS_BellevueBooking_LocalServer')]",

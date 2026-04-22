@@ -31,18 +31,6 @@
 			"type": "string",
 			"defaultValue": "https://DataCycleGroup3Keys.vault.azure.net/"
 		},
-		"LS_AzureSQL_Gold_properties_typeProperties_server": {
-			"type": "string",
-			"defaultValue": "sqlserver-bellevue-grp3.database.windows.net"
-		},
-		"LS_AzureSQL_Gold_properties_typeProperties_database": {
-			"type": "string",
-			"defaultValue": "sqldb-bellevue-gold"
-		},
-		"LS_AzureSQL_Gold_properties_typeProperties_userName": {
-			"type": "string",
-			"defaultValue": "dylan.sanderso"
-		},
 		"LS_BellevueBooking_LocalServer_properties_typeProperties_host": {
 			"type": "string",
 			"defaultValue": "\\\\10.130.25.152\\BellevueBooking"
@@ -149,15 +137,6 @@
 					},
 					"AzureDatabricks_properties_typeProperties_existingClusterId": {
 						"value": "[parameters('AzureDatabricks_properties_typeProperties_existingClusterId')]"
-					},
-					"LS_AzureSQL_Gold_properties_typeProperties_server": {
-						"value": "[parameters('LS_AzureSQL_Gold_properties_typeProperties_server')]"
-					},
-					"LS_AzureSQL_Gold_properties_typeProperties_database": {
-						"value": "[parameters('LS_AzureSQL_Gold_properties_typeProperties_database')]"
-					},
-					"LS_AzureSQL_Gold_properties_typeProperties_userName": {
-						"value": "[parameters('LS_AzureSQL_Gold_properties_typeProperties_userName')]"
 					},
 					"LS_BellevueBooking_LocalServer_properties_typeProperties_host": {
 						"value": "[parameters('LS_BellevueBooking_LocalServer_properties_typeProperties_host')]"
