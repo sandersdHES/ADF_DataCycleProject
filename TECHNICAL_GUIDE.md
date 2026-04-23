@@ -302,17 +302,31 @@ Runs `Azure/data-factory-validate-action@v1.1.4` against `adf/` on any PR touchi
 1. `Azure/data-factory-export-action@v1.1.4` builds `ARMTemplateForFactory.json` from the source JSON in `adf/` — **no `adf_publish` branch required**.
 2. `Azure/data-factory-deploy-action@v1.2.0` stops triggers, deploys the linked-template master with SAS staging, and restarts triggers.
 
-Required GitHub Environment `prod`:
+#### Authentication — User-Assigned Managed Identity (UAMI)
 
-| Secret | Purpose |
+The workflow authenticates to Azure via **OIDC with a User-Assigned Managed Identity** rather than a classic App Registration. A UAMI is a plain Azure resource (not an Azure AD tenant object), so it can be created by any subscription Owner without IT/admin involvement.
+
+The identity `gh-datacycle-oidc` lives in the same resource group as `group3-df` and carries:
+- A **Contributor** role assignment on the resource group (enough to deploy ADF ARM).
+- A **federated credential** pinned to `repo:sandersdHES/ADF_DataCycleProject:environment:prod` — only GitHub Actions jobs running under the `prod` environment can request a token for it.
+
+`azure/login@v2` accepts UAMI and App Registration identically — the workflow needs no changes if the identity type changes in the future.
+
+#### GitHub Environment `prod` — required values
+
+**Secrets:**
+
+| Secret | Value |
 |---|---|
-| `AZURE_CLIENT_ID` / `AZURE_TENANT_ID` / `AZURE_SUBSCRIPTION_ID` | OIDC federated identity |
+| `AZURE_CLIENT_ID` | Client ID (UUID) of the `gh-datacycle-oidc` UAMI |
+| `AZURE_TENANT_ID` | Azure AD tenant ID of the subscription |
+| `AZURE_SUBSCRIPTION_ID` | Target subscription ID |
 
-Required Environment variables:
+**Variables** (plain text, not secrets):
 
 | Variable | Value |
 |---|---|
-| `AZURE_RESOURCE_GROUP` | RG containing the factory |
+| `AZURE_RESOURCE_GROUP` | RG containing `group3-df` |
 | `AZURE_ADF_NAME` | `group3-df` |
 
 Infrastructure-layer changes (Bicep, SQL DDL, Databricks cluster) are **not** part of day-to-day CI — see §11.
@@ -364,7 +378,7 @@ This project currently runs on a manually-provisioned Azure environment. To keep
 
 1. Move `infrastructure/future/workflows/*.yml` back into `.github/workflows/`.
 2. Create a GitHub Environment `dev` with the secret set documented in `DEPLOY.md`.
-3. Configure the AAD app + OIDC federated credential.
+3. Create a UAMI (or AAD app) + OIDC federated credential scoped to the new environment (see §9.2).
 4. Run `deploy-dev.yml` once to build a parallel environment; verify; tear down with `destroy-dev.yml`.
 
 Until then these files are just "scaffolding in the attic" — they pay no cost, break nothing, and will be green on `validate.yml` because nothing references them.
