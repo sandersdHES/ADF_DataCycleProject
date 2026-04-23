@@ -25,6 +25,6 @@ jobs:
       # Validates that ADF source JSON in adf/ is internally consistent (no dangling
       # references between pipelines, datasets, linked services, triggers).
       - name: Validate ADF source
-        uses: Azure/data-factory-validate-action@v1.1.4
+        uses: Azure/data-factory-validate-action@v1.1.6
         with:
           path: ${{ github.workspace }}/adf
