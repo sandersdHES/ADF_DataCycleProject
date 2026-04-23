@@ -10,42 +10,80 @@ Everything stays in place — ADLS data, SQL, Databricks workspace, Key Vault se
 
 ## 2. Wire up the ADF deploy workflow
 
-### Create AAD app + OIDC federated credential
+### Why not an App Registration?
+
+Creating an **App Registration** is an Azure AD tenant operation — it requires the
+"Application Developer" role (or Global Admin), which IT departments typically restrict.
+
+### Recommended: User-Assigned Managed Identity (UAMI)
+
+A UAMI is an **Azure resource** (not an Azure AD object). You can create it yourself
+with Owner rights on your subscription — no IT involvement needed. `azure/login@v2`
+supports it natively; **no workflow changes required**.
+
+#### Step 1 — Create the UAMI and federated credential
 
 ```bash
-APP_ID=$(az ad app create --display-name "gh-datacycle-oidc" --query appId -o tsv)
-az ad sp create --id "$APP_ID"
+RG_NAME=<your-rg>            # the RG that contains group3-df
+SUBSCRIPTION_ID=<your-sub-id>
 
-# Role on the RG that contains group3-df (Contributor is enough for ADF deploy)
+# Create the identity (Azure resource — no AAD admin needed)
+az identity create \
+  --name gh-datacycle-oidc \
+  --resource-group "$RG_NAME"
+
+# Capture its client ID
+CLIENT_ID=$(az identity show \
+  --name gh-datacycle-oidc \
+  --resource-group "$RG_NAME" \
+  --query clientId -o tsv)
+
+# Capture its principal ID (for the role assignment)
+PRINCIPAL_ID=$(az identity show \
+  --name gh-datacycle-oidc \
+  --resource-group "$RG_NAME" \
+  --query principalId -o tsv)
+
+# Grant Contributor on the RG (enough for ADF deploy)
 az role assignment create \
-  --assignee "$APP_ID" \
+  --assignee-object-id "$PRINCIPAL_ID" \
+  --assignee-principal-type ServicePrincipal \
   --role "Contributor" \
-  --scope "/subscriptions/<SUBSCRIPTION_ID>/resourceGroups/<RG_NAME>"
+  --scope "/subscriptions/$SUBSCRIPTION_ID/resourceGroups/$RG_NAME"
 
-az ad app federated-credential create \
-  --id "$APP_ID" \
-  --parameters '{
-    "name": "gh-datacycle-prod",
-    "issuer": "https://token.actions.githubusercontent.com",
-    "subject": "repo:<OWNER>/ADF_DataCycleProject:environment:prod",
-    "audiences": ["api://AzureADTokenExchange"]
-  }'
+# Add the federated credential — ties this identity to GitHub Actions + the prod environment
+az identity federated-credential create \
+  --name gh-datacycle-prod \
+  --identity-name gh-datacycle-oidc \
+  --resource-group "$RG_NAME" \
+  --issuer "https://token.actions.githubusercontent.com" \
+  --subject "repo:sandersdHES/ADF_DataCycleProject:environment:prod" \
+  --audiences "api://AzureADTokenExchange"
 ```
 
-### Create GitHub Environment `prod`
+> **Output you need:** `CLIENT_ID` from the `az identity show` command above
+> (looks like a UUID, e.g. `12345678-abcd-...`). Keep it for the next step.
 
-Settings → Environments → New environment → `prod`.
+#### Step 2 — Create GitHub Environment `prod`
+
+Settings → Environments → New environment → **`prod`**.
 
 **Secrets** (scoped to the environment):
 
-- [ ] `AZURE_CLIENT_ID` — `appId` from the step above
-- [ ] `AZURE_TENANT_ID`
-- [ ] `AZURE_SUBSCRIPTION_ID`
+- [ ] `AZURE_CLIENT_ID` — the `CLIENT_ID` from Step 1
+- [ ] `AZURE_TENANT_ID` — your Azure AD tenant ID (`az account show --query tenantId -o tsv`)
+- [ ] `AZURE_SUBSCRIPTION_ID` — your subscription ID (`az account show --query id -o tsv`)
 
-**Variables** (same environment):
+**Variables** (same environment — *not* secrets, plain text is fine):
 
-- [ ] `AZURE_RESOURCE_GROUP` — RG containing `group3-df`
+- [ ] `AZURE_RESOURCE_GROUP` — the RG containing `group3-df`
 - [ ] `AZURE_ADF_NAME` — `group3-df`
+
+---
+
+> **Alternative — ask IT (if UAMI creation is also restricted)**
+> Ask your IT admin to run the commands in Step 1 and hand back the `CLIENT_ID`.
+> Everything in Step 2 you still do yourself. This is a single 10-minute task for them.
 
 ## 3. First deploy
 
