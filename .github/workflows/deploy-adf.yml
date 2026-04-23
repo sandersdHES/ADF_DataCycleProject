@@ -41,10 +41,14 @@ jobs:
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
       # Builds ARMTemplateForFactory.json from adf/ source — no adf_publish branch needed.
+      # Path is relative because the action runs inside a Docker container where the
+      # repo is mounted at /github/workspace — an absolute host path breaks the mount.
+      # Output lands in an `armTemplate/` subdirectory under the given path.
       - name: Export ADF ARM from source
+        id: export
         uses: Azure/data-factory-export-action@v1.2.1
         with:
-          path: ${{ github.workspace }}/adf
+          path: ./adf
           id: /subscriptions/${{ secrets.AZURE_SUBSCRIPTION_ID }}/resourceGroups/${{ vars.AZURE_RESOURCE_GROUP }}/providers/Microsoft.DataFactory/factories/${{ vars.AZURE_ADF_NAME }}
 
       # Stops triggers, deploys the linked-template master with SAS staging, restarts triggers.
@@ -53,7 +57,7 @@ jobs:
         with:
           resourceGroupName: ${{ vars.AZURE_RESOURCE_GROUP }}
           dataFactoryName: ${{ vars.AZURE_ADF_NAME }}
-          armTemplateFile: ExportedArmTemplate/ARMTemplateForFactory.json
-          armTemplateParametersFile: ExportedArmTemplate/ARMTemplateParametersForFactory.json
+          armTemplateFile: ${{ steps.export.outputs.arm-template-directory }}/ARMTemplateForFactory.json
+          armTemplateParametersFile: ${{ steps.export.outputs.arm-template-directory }}/ARMTemplateParametersForFactory.json
           additionalParameters: >-
             factoryName=${{ vars.AZURE_ADF_NAME }}
