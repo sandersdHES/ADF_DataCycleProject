@@ -38,6 +38,7 @@
 									"Content-Type": "application/json"
 								},
 								"url": "https://api.edu-hub.knime.com/deployments/rest:509f9c76-1fd3-444d-80a6-4df7848b1621/execution",
+								"body": "{}",
 								"authentication": {
 									"type": "Basic",
 									"username": "N8XZA3zjIJVLk-P2XxLKBkLv1_aT-bX302wwgIGOmrY",
@@ -80,6 +81,7 @@
 						"Content-Type": "application/json"
 					},
 					"url": "https://api.edu-hub.knime.com/deployments/rest:348633fa-f10f-4a27-99de-11e1707190cb/execution",
+					"body": "{}",
 					"authentication": {
 						"type": "Basic",
 						"username": "N8XZA3zjIJVLk-P2XxLKBkLv1_aT-bX302wwgIGOmrY",
@@ -119,6 +121,7 @@
 						"Content-Type": "application/json"
 					},
 					"url": "https://api.edu-hub.knime.com/deployments/rest:eb96aa91-239b-4cf2-8c7e-a8a40516d4f3/execution",
+					"body": "{}",
 					"authentication": {
 						"type": "Basic",
 						"username": "N8XZA3zjIJVLk-P2XxLKBkLv1_aT-bX302wwgIGOmrY",
@@ -151,6 +154,7 @@
 						"Content-Type": "application/json"
 					},
 					"url": "https://api.edu-hub.knime.com/deployments/rest:e481f0fd-89ba-409a-aaa2-d8a648956949/execution",
+					"body": "{}",
 					"authentication": {
 						"type": "Basic",
 						"username": "N8XZA3zjIJVLk-P2XxLKBkLv1_aT-bX302wwgIGOmrY",
