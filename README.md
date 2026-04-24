@@ -53,6 +53,7 @@ ADF_DataCycleProject/
 │
 ├── adf/                              # Azure Data Factory source JSON
 │   ├── factory/group3-df.json        # Factory definition
+│   ├── credential/                   # 1 UAMI credential (gh-datacycle-oidc)
 │   ├── linkedService/                # 10 linked services (ADLS, SQL, KV, SHIR, Databricks…)
 │   ├── dataset/                      # 19 datasets
 │   ├── pipeline/                     # 9 pipelines

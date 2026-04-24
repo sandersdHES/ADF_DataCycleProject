@@ -55,6 +55,7 @@ Every arrow runs under orchestration — there is no direct producer-to-consumer
 .
 ├── adf/                              # ADF source JSON (factory=group3-df)
 │   ├── factory/group3-df.json
+│   ├── credential/                   # 1 UAMI credential (gh-datacycle-oidc)
 │   ├── linkedService/                # 10 linked services
 │   ├── dataset/                      # 19 datasets
 │   ├── pipeline/                     # 9 pipelines
@@ -166,7 +167,7 @@ KNIME authenticates as user `N8XZA3zjIJVLk-P2XxLKBkLv1_aT-bX302wwgIGOmrY` using 
 |---|---|---|
 | `AzureDatabricks` | Databricks | Existing cluster `0223-115927-nvtos4a4` |
 | `LS_Databricks_Silver` | Databricks (job cluster) | PAT from AKV |
-| `LS_ADLS_Bronze` | Azure Blob FS (Gen2) | `adlsbellevuegrp3.dfs.core.windows.net` |
+| `LS_ADLS_Bronze` | Azure Blob FS (Gen2) | `adlsbellevuegrp3.dfs.core.windows.net` — authenticates via UAMI `gh-datacycle-oidc` (ADF credential object) |
 | `LS_DevDB_Gold` | Azure SQL | `sqlserver-bellevue-grp3.database.windows.net` / `DevDB` |
 | `LS_AKV` | Key Vault | `DataCycleGroup3Keys` |
 | `LS_AzureFileShare_SAC` | File Share | `sac-export-share` |
@@ -175,7 +176,7 @@ KNIME authenticates as user `N8XZA3zjIJVLk-P2XxLKBkLv1_aT-bX302wwgIGOmrY` using 
 | `LS_Solarlogs_LocalServer` | File System | SMB via SHIR |
 | `LS_SFTP_LocalServer` | SFTP | SFTP via SHIR |
 
-Most credentials are either ADF `encryptedCredential` blobs or Key Vault references — **none live in git**.
+`LS_ADLS_Bronze` uses the `gh-datacycle-oidc` UAMI registered in `adf/credential/gh-datacycle-oidc.json` — OAuth2/RBAC, no account key. All other credentials are either ADF `encryptedCredential` blobs or Key Vault references — **none live in git**.
 
 ---
 
