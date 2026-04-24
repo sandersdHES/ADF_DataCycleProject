@@ -14,7 +14,6 @@ on:
     branches: [main]
     paths:
       - 'adf/**'
-      - 'sql/**'
       - '.github/workflows/deploy-adf.yml'
   workflow_dispatch:
 
@@ -66,56 +65,3 @@ jobs:
           armTemplateParametersFile: ${{ steps.export.outputs.arm-template-directory }}/ARMTemplateParametersForFactory.json
           additionalParameters: >-
             factoryName=${{ vars.AZURE_ADF_NAME }}
-
-  deploy-sql:
-    name: Deploy SQL schema and security
-    runs-on: ubuntu-latest
-    environment: prod
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Azure login (OIDC)
-        uses: azure/login@v2
-        with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-
-      - name: Get SQL password from Key Vault
-        id: sql-pwd
-        run: |
-          pwd=$(az keyvault secret show \
-            --vault-name DataCycleGroup3Keys \
-            --name Admin-SQL-Password \
-            --query value -o tsv)
-          echo "::add-mask::$pwd"
-          echo "value=$pwd" >> "$GITHUB_OUTPUT"
-
-      # sqlcmd is pre-installed on ubuntu-latest (mssql-tools).
-      # -b  abort batch on first error
-      # -l  login timeout (seconds) — serverless DB may need up to 60 s to resume
-      # deploy_schema.sql runs first; deploy_security.sql depends on the tables it creates.
-      - name: Deploy deploy_schema.sql
-        run: |
-          for i in 1 2 3; do
-            sqlcmd \
-              -S sqlserver-bellevue-grp3.database.windows.net,1433 \
-              -d DevDB \
-              -U "dylan.sanderso@sqlserver-bellevue-grp3" \
-              -P "${{ steps.sql-pwd.outputs.value }}" \
-              -i sql/deploy_schema.sql \
-              -b -l 60 && break
-            echo "Attempt $i failed (serverless resume?), retrying in 60s..."
-            sleep 60
-          done
-
-      - name: Deploy deploy_security.sql
-        run: |
-          sqlcmd \
-            -S sqlserver-bellevue-grp3.database.windows.net,1433 \
-            -d DevDB \
-            -U "dylan.sanderso@sqlserver-bellevue-grp3" \
-            -P "${{ steps.sql-pwd.outputs.value }}" \
-            -v SQL_USER_PASSWORD="${{ steps.sql-pwd.outputs.value }}" \
-            -i sql/deploy_security.sql \
-            -b -l 60

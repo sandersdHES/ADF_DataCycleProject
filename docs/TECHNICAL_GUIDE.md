@@ -317,7 +317,7 @@ Populating `ref_user_division_access` is a manual step — insert one row per Di
 
 ## 9. CI/CD
 
-Three active workflows:
+Two active workflows:
 
 ### 9.1 [`validate.yml`](.github/workflows/validate.yml) — PR gate
 
@@ -325,25 +325,17 @@ Runs `Azure/data-factory-validate-action@v1.1.4` against `adf/` on any PR touchi
 
 ### 9.2 [`deploy-adf.yml`](.github/workflows/deploy-adf.yml) — push to main
 
-Triggered on push to `main` when `adf/**` or `sql/**` files change. Contains two parallel jobs:
-
-**`deploy` job — ADF:**
 1. `Azure/data-factory-export-action@v1.2.1` builds `ARMTemplateForFactory.json` from the source JSON in `adf/` — **no `adf_publish` branch required**.
 2. `Azure/data-factory-deploy-action@v1.2.0` stops triggers, deploys the linked-template master with SAS staging, and restarts triggers.
 
-**`deploy-sql` job — SQL schema and security:**
-1. Fetches `Admin-SQL-Password` from Key Vault `DataCycleGroup3Keys` using the OIDC token (no SQL credentials stored in GitHub).
-2. Runs `sql/deploy_schema.sql` via `sqlcmd` with a 3-attempt retry loop (handles serverless DB resume).
-3. Runs `sql/deploy_security.sql` via `sqlcmd`, passing the password as a sqlcmd variable for the one-time user-creation guard.
-
-Both jobs use the same `environment: prod` and OIDC identity. They run in parallel — neither depends on the other.
+SQL schema changes (`sql/deploy_schema.sql`, `sql/deploy_security.sql`) are **not** deployed automatically today — see §11 for the ready-to-activate `deploy-sql.yml` workflow.
 
 #### Authentication — User-Assigned Managed Identity (UAMI)
 
 The workflow authenticates to Azure via **OIDC with a User-Assigned Managed Identity** rather than a classic App Registration. A UAMI is a plain Azure resource (not an Azure AD tenant object), so it can be created by any subscription Owner without IT/admin involvement.
 
 The identity `gh-datacycle-oidc` lives in the same resource group as `group3-df` and carries:
-- A **Contributor** role assignment on the resource group (enough to deploy ADF ARM and read Key Vault secrets).
+- A **Contributor** role assignment on the resource group (enough to deploy ADF ARM).
 - A **federated credential** pinned to `repo:sandersdHES/ADF_DataCycleProject:environment:prod` — only GitHub Actions jobs running under the `prod` environment can request a token for it.
 
 `azure/login@v2` accepts UAMI and App Registration identically — the workflow needs no changes if the identity type changes in the future.
@@ -365,8 +357,6 @@ The identity `gh-datacycle-oidc` lives in the same resource group as `group3-df`
 | `AZURE_RESOURCE_GROUP` | RG containing `group3-df` |
 | `AZURE_ADF_NAME` | `group3-df` |
 
-No SQL credentials are stored in GitHub — the `deploy-sql` job retrieves `Admin-SQL-Password` at runtime from Key Vault using the OIDC token.
-
 ### 9.3 Dependabot
 
 Weekly updates for the GitHub Actions ecosystem (`.github/dependabot.yml`). Keeps `Azure/data-factory-*-action` pinned versions fresh.
@@ -381,7 +371,7 @@ Weekly updates for the GitHub Actions ecosystem (`.github/dependabot.yml`). Keep
 |---|---|
 | `Databricks-Access-Token` | ADF `LS_Databricks_Silver` |
 | `adls-access-key` | All notebooks (OAuth-less JDBC to SQL still needs this for ADLS reads) |
-| `Admin-SQL-Password` | All gold-writing notebooks, `LS_DevDB_Gold`, CI `deploy-sql` job |
+| `Admin-SQL-Password` | All gold-writing notebooks, `LS_DevDB_Gold` |
 | `Admin-VM-Password`, `Student-VM-Password` | ADF `LS_*_LocalServer`, `LS_SFTP_LocalServer` |
 | `knime`, `knimeappid`, `knimeappsecret` | `Run_Knime` Web activities |
 | `sacpassword` | `LS_AzureFileShare_SAC` |
@@ -391,7 +381,7 @@ Weekly updates for the GitHub Actions ecosystem (`.github/dependabot.yml`). Keep
 - `ml_models_config.json` — model metadata. Read + written by `ml_load_predictions.py` when KNIME reports new features.
 - `electricity_tariff_config.json` — `{ "tariff_chf_per_kwh": 0.15 }`. Read by documentation tooling; the SQL computed columns currently use a hard-coded literal.
 
-**GitHub Secrets** (see §9) are only OIDC identity and factory-targeting values — no application secrets. All runtime credentials stay in Key Vault. The `deploy-sql` CI job retrieves `Admin-SQL-Password` from Key Vault at runtime using the OIDC token.
+**GitHub Secrets** (see §9) are only OIDC identity and factory-targeting values — no application secrets. All runtime credentials stay in Key Vault.
 
 ---
 
@@ -407,13 +397,28 @@ This project currently runs on a manually-provisioned Azure environment. To keep
 | Databricks provisioner | [`scripts/deploy_databricks.sh`](scripts/deploy_databricks.sh) | Consumed by the unwired `deploy-dev.yml` |
 | SQL structural DDL | [`sql/deploy_schema.sql`](sql/deploy_schema.sql) | Idempotent — tables, views, stored procedure |
 | SQL security DDL | [`sql/deploy_security.sql`](sql/deploy_security.sql) | Idempotent — roles, RLS, user, grants. Run after deploy_schema.sql |
+| SQL deploy workflow | [`infrastructure/future/workflows/deploy-sql.yml`](infrastructure/future/workflows/deploy-sql.yml) | Ready to activate — requires Key Vault Secrets User role on the UAMI (see below) |
 | Bacpac seed | `infrastructure/exported/DataCycleDB.bacpac` | One-shot data load for a fresh DB |
 | Frozen exports | [`infrastructure/exported/`](infrastructure/exported/) | ARM + Bicep snapshots of the current environment for diffing |
 | Runbook | [`infrastructure/DEPLOY.md`](infrastructure/DEPLOY.md) | Full rebuild procedure |
 
-**How to activate it** (should the POC ever need to become reproducible):
+**How to activate the SQL deploy workflow** (two-step, no rebuild needed):
 
-1. Move `infrastructure/future/workflows/*.yml` back into `.github/workflows/`.
+1. Grant `Key Vault Secrets User` role to the `gh-datacycle-oidc` UAMI on the Key Vault:
+   ```bash
+   az role assignment create \
+     --assignee-object-id <UAMI_PRINCIPAL_ID> \
+     --assignee-principal-type ServicePrincipal \
+     --role "Key Vault Secrets User" \
+     --scope "/subscriptions/<SUB>/resourceGroups/<RG>/providers/Microsoft.KeyVault/vaults/DataCycleGroup3Keys"
+   ```
+2. Move `infrastructure/future/workflows/deploy-sql.yml` to `.github/workflows/deploy-sql.yml`.
+
+> **Why it is not active today:** the `gh-datacycle-oidc` UAMI currently has only `Contributor` on the resource group. Key Vault uses a separate RBAC plane — `Contributor` does not grant secret reads. The workflow fails with `ForbiddenByRbac` without the explicit `Key Vault Secrets User` assignment.
+
+**How to activate the full environment rebuild** (should the POC ever need to become reproducible):
+
+1. Move `infrastructure/future/workflows/deploy-dev.yml` and `destroy-dev.yml` into `.github/workflows/`.
 2. Create a GitHub Environment `dev` with the secret set documented in `DEPLOY.md`.
 3. Create a UAMI (or AAD app) + OIDC federated credential scoped to the new environment (see §9.2).
 4. Run `deploy-dev.yml` once to build a parallel environment; verify; tear down with `destroy-dev.yml`.

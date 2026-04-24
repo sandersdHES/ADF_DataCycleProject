@@ -1,0 +1,99 @@
+name: Deploy SQL schema and security
+
+# Deploys sql/deploy_schema.sql then sql/deploy_security.sql to DevDB.
+#
+# STATUS: intentionally NOT in .github/workflows/ — see prerequisites below.
+#
+# PREREQUISITES before activating this workflow:
+#
+#   1. Grant the UAMI 'gh-datacycle-oidc' read access to Key Vault secrets:
+#
+#      az role assignment create \
+#        --assignee-object-id <UAMI_PRINCIPAL_ID> \
+#        --assignee-principal-type ServicePrincipal \
+#        --role "Key Vault Secrets User" \
+#        --scope "/subscriptions/<SUB_ID>/resourceGroups/<RG>/providers/Microsoft.KeyVault/vaults/DataCycleGroup3Keys"
+#
+#      (Contributor on the RG is NOT sufficient — Key Vault uses a separate RBAC plane.)
+#
+#   2. Ensure the Azure SQL firewall allows connections from GitHub Actions runner IPs,
+#      or that "Allow Azure services" is enabled on the SQL server.
+#
+#   3. Move this file to .github/workflows/deploy-sql.yml.
+#
+# HOW TO ACTIVATE:
+#   mv infrastructure/future/workflows/deploy-sql.yml .github/workflows/deploy-sql.yml
+#
+# Requires GitHub Environment 'prod' with the same secrets as deploy-adf.yml:
+#   - AZURE_CLIENT_ID / AZURE_TENANT_ID / AZURE_SUBSCRIPTION_ID (OIDC)
+#   - AZURE_RESOURCE_GROUP (variable)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'sql/**'
+      - 'infrastructure/future/workflows/deploy-sql.yml'
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: deploy-sql
+  cancel-in-progress: false
+
+jobs:
+  deploy-sql:
+    name: Deploy SQL schema and security
+    runs-on: ubuntu-latest
+    environment: prod
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Get SQL password from Key Vault
+        id: sql-pwd
+        run: |
+          pwd=$(az keyvault secret show \
+            --vault-name DataCycleGroup3Keys \
+            --name Admin-SQL-Password \
+            --query value -o tsv)
+          echo "::add-mask::$pwd"
+          echo "value=$pwd" >> "$GITHUB_OUTPUT"
+
+      # sqlcmd is pre-installed on ubuntu-latest (mssql-tools).
+      # -b  abort batch on first error
+      # -l  login timeout (seconds) — serverless DB may need up to 60 s to resume
+      # deploy_schema.sql runs first; deploy_security.sql depends on the tables it creates.
+      - name: Deploy deploy_schema.sql
+        run: |
+          for i in 1 2 3; do
+            sqlcmd \
+              -S sqlserver-bellevue-grp3.database.windows.net,1433 \
+              -d DevDB \
+              -U "dylan.sanderso@sqlserver-bellevue-grp3" \
+              -P "${{ steps.sql-pwd.outputs.value }}" \
+              -i sql/deploy_schema.sql \
+              -b -l 60 && break
+            echo "Attempt $i failed (serverless resume?), retrying in 60s..."
+            sleep 60
+          done
+
+      - name: Deploy deploy_security.sql
+        run: |
+          sqlcmd \
+            -S sqlserver-bellevue-grp3.database.windows.net,1433 \
+            -d DevDB \
+            -U "dylan.sanderso@sqlserver-bellevue-grp3" \
+            -P "${{ steps.sql-pwd.outputs.value }}" \
+            -v SQL_USER_PASSWORD="${{ steps.sql-pwd.outputs.value }}" \
+            -i sql/deploy_security.sql \
+            -b -l 60
