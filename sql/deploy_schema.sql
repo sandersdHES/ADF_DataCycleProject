@@ -20,14 +20,24 @@ GO
 IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'dim_date' AND schema_id = SCHEMA_ID('dbo'))
 BEGIN
   CREATE TABLE dbo.dim_date (
-    DateKey     INT         NOT NULL PRIMARY KEY,
-    FullDate    DATE        NOT NULL,
-    [Year]      SMALLINT    NOT NULL,
-    [Month]     TINYINT     NOT NULL,
-    MonthName   NVARCHAR(20) NOT NULL,
-    [Day]       TINYINT     NOT NULL,
-    DayOfWeek   TINYINT     NOT NULL,
-    IsWeekend   BIT         NOT NULL
+    DateKey          INT          NOT NULL PRIMARY KEY,
+    FullDate         DATE         NOT NULL,
+    [Year]           SMALLINT     NOT NULL,
+    Quarter          TINYINT      NOT NULL,
+    [Month]          TINYINT      NOT NULL,
+    MonthName        NVARCHAR(20) NOT NULL,
+    MonthShort       NCHAR(3)     NOT NULL,
+    WeekOfYear       TINYINT      NOT NULL,
+    DayOfMonth       TINYINT      NOT NULL,
+    DayOfWeek        TINYINT      NOT NULL,
+    DayName          NVARCHAR(20) NOT NULL,
+    IsWeekend        BIT          NOT NULL CONSTRAINT DF_dim_date_IsWeekend        DEFAULT (0),
+    IsSwissHoliday   BIT          NOT NULL CONSTRAINT DF_dim_date_IsSwissHoliday   DEFAULT (0),
+    HolidayName      NVARCHAR(50) NULL,
+    Season           NVARCHAR(10) NOT NULL,
+    AcademicYear     NVARCHAR(9)  NOT NULL,
+    AcademicSemester NVARCHAR(15) NOT NULL,
+    IsAcademicDay    BIT          NOT NULL CONSTRAINT DF_dim_date_IsAcademicDay    DEFAULT (0)
   );
 END
 GO
@@ -35,10 +45,16 @@ GO
 IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'dim_time' AND schema_id = SCHEMA_ID('dbo'))
 BEGIN
   CREATE TABLE dbo.dim_time (
-    TimeKey     SMALLINT NOT NULL PRIMARY KEY,
-    [Hour]      TINYINT  NOT NULL,
-    [Minute]    TINYINT  NOT NULL,
-    TimeOfDay   NVARCHAR(20) NOT NULL
+    TimeKey        SMALLINT     NOT NULL PRIMARY KEY,
+    TimeLabel      NCHAR(5)     NOT NULL,
+    [Hour]         TINYINT      NOT NULL,
+    [Minute]       TINYINT      NOT NULL,
+    QuarterHourSlot TINYINT     NOT NULL,
+    HalfHourSlot   TINYINT      NOT NULL,
+    HourSlot       TINYINT      NOT NULL,
+    TimePeriod     NVARCHAR(15) NOT NULL,
+    IsBusinessHour BIT          NOT NULL CONSTRAINT DF_dim_time_IsBusinessHour DEFAULT (0),
+    IsLectureHour  BIT          NOT NULL CONSTRAINT DF_dim_time_IsLectureHour  DEFAULT (0)
   );
 END
 GO
@@ -401,6 +417,138 @@ JOIN dbo.dim_date     d ON d.DateKey     = f.DateKey
 JOIN dbo.dim_inverter i ON i.InverterKey = f.InverterKey
 GROUP BY i.InverterID, i.RatedPower_kWp, d.FullDate;
 GO
+
+----------------------------------------------------------------------
+-- Views consumed by Power BI dashboards
+----------------------------------------------------------------------
+
+CREATE OR ALTER VIEW dbo.vw_daily_energy_balance
+AS
+SELECT
+    d.FullDate,
+    d.[Year],
+    d.[Month],
+    d.MonthName,
+    d.Quarter,
+    d.IsWeekend,
+    d.IsAcademicDay,
+    d.Season,
+    ISNULL(SUM(fp.DeltaEnergy_Kwh), 0)                                     AS TotalProduction_Kwh,
+    ISNULL(SUM(fc.DeltaEnergy_Kwh), 0)                                     AS TotalConsumption_Kwh,
+    ISNULL(SUM(fc.DeltaEnergy_Kwh), 0) - ISNULL(SUM(fp.DeltaEnergy_Kwh), 0) AS NetConsumption_Kwh,
+    ISNULL(SUM(fc.DeltaEnergy_Kwh), 0) * 0.1500                            AS TotalCost_CHF,
+    ISNULL(SUM(fp.DeltaEnergy_Kwh), 0) * 0.1500                            AS TotalProductionValue_CHF,
+    CASE WHEN ISNULL(SUM(fc.DeltaEnergy_Kwh), 0) > 0
+         THEN ISNULL(SUM(fp.DeltaEnergy_Kwh), 0) / ISNULL(SUM(fc.DeltaEnergy_Kwh), 0)
+         ELSE 0 END                                                         AS SelfSufficiencyRatio
+FROM dbo.dim_date d
+LEFT JOIN dbo.fact_solar_production   fp ON fp.DateKey = d.DateKey
+LEFT JOIN dbo.fact_energy_consumption fc ON fc.DateKey = d.DateKey
+GROUP BY d.FullDate, d.[Year], d.[Month], d.MonthName, d.Quarter,
+         d.IsWeekend, d.IsAcademicDay, d.Season;
+GO
+
+CREATE OR ALTER VIEW dbo.vw_building_occupation
+AS
+SELECT
+    d.FullDate,
+    d.[Year],
+    d.[Month],
+    d.MonthName,
+    d.WeekOfYear,
+    d.DayName,
+    d.IsWeekend,
+    d.IsAcademicDay,
+    r.RoomCode,
+    r.[Floor],
+    r.Wing,
+    r.RoomType,
+    div.SchoolName,
+    div.DivisionCode,
+    COUNT(frb.BookingKey)                              AS BookingCount,
+    ISNULL(SUM(frb.DurationMinutes), 0)                AS TotalBookedMinutes,
+    ISNULL(SUM(frb.DurationMinutes), 0) * 100.0 / 720.0 AS OccupationPct,
+    MIN(t_start.TimeLabel)                             AS EarliestBookingTime,
+    MAX(t_end.TimeLabel)                               AS LatestBookingTime
+FROM dbo.dim_date d
+CROSS JOIN dbo.dim_room r
+LEFT JOIN dbo.fact_room_booking frb
+       ON frb.DateKey = d.DateKey AND frb.RoomKey = r.RoomKey
+LEFT JOIN dbo.dim_time     t_start ON t_start.TimeKey = frb.StartTimeKey
+LEFT JOIN dbo.dim_time     t_end   ON t_end.TimeKey   = frb.EndTimeKey
+LEFT JOIN dbo.dim_division div     ON div.DivisionKey = frb.DivisionKey
+WHERE d.IsAcademicDay = 1
+GROUP BY d.FullDate, d.[Year], d.[Month], d.MonthName, d.WeekOfYear,
+         d.DayName, d.IsWeekend, d.IsAcademicDay,
+         r.RoomCode, r.[Floor], r.Wing, r.RoomType,
+         div.SchoolName, div.DivisionCode;
+GO
+
+CREATE OR ALTER VIEW dbo.vw_kpi_dashboard_home
+AS
+SELECT
+    d.FullDate,
+    d.[Year],
+    d.[Month],
+    ISNULL(fc.DeltaEnergy_Kwh, 0) * 0.1500         AS Consumption_CHF,
+    ISNULL(fc.DeltaEnergy_Kwh, 0)                  AS Consumption_Kwh,
+    ISNULL(fp.DeltaEnergy_Kwh, 0)                  AS Production_Kwh,
+    env.Temperature_C,
+    env.Humidity_Pct,
+    fsi_agg.TotalReadings,
+    fsi_agg.FailureReadings,
+    CASE WHEN fsi_agg.TotalReadings > 0
+         THEN fsi_agg.FailureReadings * 100.0 / fsi_agg.TotalReadings
+         ELSE 0 END                                AS PanelFailureRate_Pct
+FROM dbo.dim_date d
+LEFT JOIN dbo.fact_energy_consumption fc  ON fc.DateKey  = d.DateKey
+LEFT JOIN dbo.dim_time                t   ON t.TimeKey   = fc.TimeKey
+LEFT JOIN dbo.fact_solar_production   fp  ON fp.DateKey  = d.DateKey AND fp.TimeKey = fc.TimeKey
+LEFT JOIN dbo.fact_environment        env ON env.DateKey = d.DateKey AND env.TimeKey = fc.TimeKey
+LEFT JOIN (
+    SELECT DateKey,
+           COUNT(*)                    AS TotalReadings,
+           SUM(CAST(IsFailure AS INT)) AS FailureReadings
+    FROM dbo.fact_solar_inverter
+    GROUP BY DateKey
+) fsi_agg ON fsi_agg.DateKey = d.DateKey;
+GO
+
+CREATE OR ALTER VIEW dbo.vw_weather_vs_production
+AS
+SELECT
+    d.FullDate,
+    d.[Year],
+    d.[Month],
+    t.[Hour],
+    t.QuarterHourSlot,
+    fp.DeltaEnergy_Kwh                             AS ActualProduction_Kwh,
+    fp.CumulativeEnergy_Kwh,
+    wf_irr.ForecastValue                           AS Irradiance_Wm2,
+    wf_temp.ForecastValue                          AS ForecastTemp_C,
+    env.Temperature_C                              AS ActualIndoorTemp_C,
+    env.Humidity_Pct                               AS ActualHumidity_Pct
+FROM dbo.dim_date d
+JOIN dbo.dim_time t ON 1 = 1
+LEFT JOIN dbo.fact_solar_production fp
+       ON fp.DateKey = d.DateKey AND fp.TimeKey = t.TimeKey
+LEFT JOIN dbo.fact_environment env
+       ON env.DateKey = d.DateKey AND env.TimeKey = t.TimeKey
+LEFT JOIN dbo.fact_weather_forecast wf_irr
+       ON wf_irr.DateKey = d.DateKey AND wf_irr.TimeKey = t.TimeKey
+      AND wf_irr.PredictionHorizon = 0
+      AND wf_irr.SiteKey = (SELECT SiteKey FROM dbo.dim_weather_site WHERE SiteName = N'Sierre')
+      AND wf_irr.MeasurementKey = (SELECT MeasurementKey FROM dbo.dim_measurement_type WHERE MeasurementCode = N'PRED_GLOB_ctrl')
+LEFT JOIN dbo.fact_weather_forecast wf_temp
+       ON wf_temp.DateKey = d.DateKey AND wf_temp.TimeKey = t.TimeKey
+      AND wf_temp.PredictionHorizon = 0
+      AND wf_temp.SiteKey = wf_irr.SiteKey
+      AND wf_temp.MeasurementKey = (SELECT MeasurementKey FROM dbo.dim_measurement_type WHERE MeasurementCode = N'PRED_T_2M_ctrl');
+GO
+
+----------------------------------------------------------------------
+-- Views consumed by SAC export (sac_export_to_adls.py)
+----------------------------------------------------------------------
 
 CREATE OR ALTER VIEW dbo.vw_prediction_accuracy
 AS

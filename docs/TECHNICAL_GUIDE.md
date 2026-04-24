@@ -260,19 +260,45 @@ Downstream, `PL_SAC_Export` binary-copies the CSV to the `sac-export-share` Azur
 
 ## 7. Data warehouse — SQL schema
 
-The authoritative schema lives in [`sql/deploy_schema.sql`](sql/deploy_schema.sql). Three notable design points:
+Two SQL files in [`sql/`](sql/) are deployed in order on every push to `main` (see §9.3):
+
+| File | Purpose |
+|---|---|
+| [`sql/deploy_schema.sql`](sql/deploy_schema.sql) | Tables, views, stored procedure — idempotent structural DDL |
+| [`sql/deploy_security.sql`](sql/deploy_security.sql) | Roles, user, RLS, permissions — idempotent security DDL |
+
+Three notable design points in the structural schema:
 
 - **Date & time keys are INT / SMALLINT surrogates**, not DATETIME. This makes `fact_*` joins cheap and partition-friendly. `dim_date` / `dim_time` are populated out-of-band (see `step1a_calculated_dimensions.sql` reference in notebooks).
 - **Computed columns are persisted server-side**, not computed in Spark:
   - `fact_solar_production.RetailValue_CHF AS DeltaEnergy_Kwh * 0.15 PERSISTED`
   - `fact_energy_consumption.CostCHF AS DeltaEnergy_Kwh * 0.15 PERSISTED`
   - `fact_room_booking.IsRecurring AS CASE WHEN RecurrenceStart/End IS NOT NULL THEN 1 ELSE 0 END PERSISTED`
-- **Three analytical views** feed Power BI / SAC:
+- **Seven analytical views** feed Power BI / SAC:
   - `vw_inverter_status_breakdown` — daily inverter status distribution, `PctOfDayReadings`.
   - `vw_inverter_performance` — actual AC power / rated capacity.
   - `vw_prediction_accuracy` — MAPE of predicted vs. actual energy.
+  - `vw_daily_energy_balance` — daily production vs. consumption, net balance, self-sufficiency ratio, CHF costs.
+  - `vw_building_occupation` — room occupation % per room per academic day (denominator = 720 min teaching day).
+  - `vw_kpi_dashboard_home` — all five Home-tab KPI cards in a single query (consumption CHF, temperature, panel failure rate, occupation, humidity).
+  - `vw_weather_vs_production` — irradiance forecast vs. actual PV output per 15-min slot (for the solar technical dashboard).
 
 The tariff of `0.15 CHF/kWh` is hard-coded in the computed columns **and** in `config/electricity_tariff_config.json`. `ref_electricity_tariff` exists with SCD2 structure for when pricing needs to become time-varying; the computed columns would then need to be replaced with view-based pricing joins.
+
+### 7.1 Security model (`sql/deploy_security.sql`)
+
+| Object | Type | Purpose |
+|---|---|---|
+| `Director_Role` | DB role | Broad read access: energy, room bookings, management KPIs |
+| `Technician_Role` | DB role | Technical read access: solar, prediction, weather data. **No access to room bookings** (GDPR) |
+| `dev.admin.sql` | SQL contained user | Member of `Technician_Role`. Password from Key Vault `Admin-SQL-Password` — never in git |
+| `ref_user_division_access` | Table | Maps Director-level login names to allowed `DivisionKey` values for RLS |
+| `fn_division_security` | Inline TVF | RLS predicate: `db_owner` + `Technician_Role` see all rows; Directors see only their mapped divisions |
+| `BookingDivisionFilter` | Security policy | Applies `fn_division_security` as a FILTER predicate on `fact_room_booking` |
+
+The RLS policy means a Director connecting as their login can only read `fact_room_booking` rows for divisions they are listed in `ref_user_division_access`. `db_owner` and `Technician_Role` bypass this filter.
+
+Populating `ref_user_division_access` is a manual step — insert one row per Director login + `DivisionKey` they should access.
 
 ---
 
@@ -291,7 +317,7 @@ The tariff of `0.15 CHF/kWh` is hard-coded in the computed columns **and** in `c
 
 ## 9. CI/CD
 
-Two active workflows:
+Three active workflows:
 
 ### 9.1 [`validate.yml`](.github/workflows/validate.yml) — PR gate
 
@@ -299,15 +325,25 @@ Runs `Azure/data-factory-validate-action@v1.1.4` against `adf/` on any PR touchi
 
 ### 9.2 [`deploy-adf.yml`](.github/workflows/deploy-adf.yml) — push to main
 
-1. `Azure/data-factory-export-action@v1.1.4` builds `ARMTemplateForFactory.json` from the source JSON in `adf/` — **no `adf_publish` branch required**.
+Triggered on push to `main` when `adf/**` or `sql/**` files change. Contains two parallel jobs:
+
+**`deploy` job — ADF:**
+1. `Azure/data-factory-export-action@v1.2.1` builds `ARMTemplateForFactory.json` from the source JSON in `adf/` — **no `adf_publish` branch required**.
 2. `Azure/data-factory-deploy-action@v1.2.0` stops triggers, deploys the linked-template master with SAS staging, and restarts triggers.
+
+**`deploy-sql` job — SQL schema and security:**
+1. Fetches `Admin-SQL-Password` from Key Vault `DataCycleGroup3Keys` using the OIDC token (no SQL credentials stored in GitHub).
+2. Runs `sql/deploy_schema.sql` via `sqlcmd` with a 3-attempt retry loop (handles serverless DB resume).
+3. Runs `sql/deploy_security.sql` via `sqlcmd`, passing the password as a sqlcmd variable for the one-time user-creation guard.
+
+Both jobs use the same `environment: prod` and OIDC identity. They run in parallel — neither depends on the other.
 
 #### Authentication — User-Assigned Managed Identity (UAMI)
 
 The workflow authenticates to Azure via **OIDC with a User-Assigned Managed Identity** rather than a classic App Registration. A UAMI is a plain Azure resource (not an Azure AD tenant object), so it can be created by any subscription Owner without IT/admin involvement.
 
 The identity `gh-datacycle-oidc` lives in the same resource group as `group3-df` and carries:
-- A **Contributor** role assignment on the resource group (enough to deploy ADF ARM).
+- A **Contributor** role assignment on the resource group (enough to deploy ADF ARM and read Key Vault secrets).
 - A **federated credential** pinned to `repo:sandersdHES/ADF_DataCycleProject:environment:prod` — only GitHub Actions jobs running under the `prod` environment can request a token for it.
 
 `azure/login@v2` accepts UAMI and App Registration identically — the workflow needs no changes if the identity type changes in the future.
@@ -329,7 +365,7 @@ The identity `gh-datacycle-oidc` lives in the same resource group as `group3-df`
 | `AZURE_RESOURCE_GROUP` | RG containing `group3-df` |
 | `AZURE_ADF_NAME` | `group3-df` |
 
-Infrastructure-layer changes (Bicep, SQL DDL, Databricks cluster) are **not** part of day-to-day CI — see §11.
+No SQL credentials are stored in GitHub — the `deploy-sql` job retrieves `Admin-SQL-Password` at runtime from Key Vault using the OIDC token.
 
 ### 9.3 Dependabot
 
@@ -345,7 +381,7 @@ Weekly updates for the GitHub Actions ecosystem (`.github/dependabot.yml`). Keep
 |---|---|
 | `Databricks-Access-Token` | ADF `LS_Databricks_Silver` |
 | `adls-access-key` | All notebooks (OAuth-less JDBC to SQL still needs this for ADLS reads) |
-| `Admin-SQL-Password` | All gold-writing notebooks, `LS_DevDB_Gold` |
+| `Admin-SQL-Password` | All gold-writing notebooks, `LS_DevDB_Gold`, CI `deploy-sql` job |
 | `Admin-VM-Password`, `Student-VM-Password` | ADF `LS_*_LocalServer`, `LS_SFTP_LocalServer` |
 | `knime`, `knimeappid`, `knimeappsecret` | `Run_Knime` Web activities |
 | `sacpassword` | `LS_AzureFileShare_SAC` |
@@ -355,7 +391,7 @@ Weekly updates for the GitHub Actions ecosystem (`.github/dependabot.yml`). Keep
 - `ml_models_config.json` — model metadata. Read + written by `ml_load_predictions.py` when KNIME reports new features.
 - `electricity_tariff_config.json` — `{ "tariff_chf_per_kwh": 0.15 }`. Read by documentation tooling; the SQL computed columns currently use a hard-coded literal.
 
-**GitHub Secrets** (see §9) are only OIDC identity and factory-targeting values — no application secrets. All runtime credentials stay in Key Vault.
+**GitHub Secrets** (see §9) are only OIDC identity and factory-targeting values — no application secrets. All runtime credentials stay in Key Vault. The `deploy-sql` CI job retrieves `Admin-SQL-Password` from Key Vault at runtime using the OIDC token.
 
 ---
 
@@ -369,7 +405,8 @@ This project currently runs on a manually-provisioned Azure environment. To keep
 | Full-deploy workflow | [`infrastructure/future/workflows/deploy-dev.yml`](infrastructure/future/workflows/deploy-dev.yml) | Moved out of `.github/workflows/` so it does not auto-trigger |
 | Teardown workflow | [`infrastructure/future/workflows/destroy-dev.yml`](infrastructure/future/workflows/destroy-dev.yml) | Same — reference only |
 | Databricks provisioner | [`scripts/deploy_databricks.sh`](scripts/deploy_databricks.sh) | Consumed by the unwired `deploy-dev.yml` |
-| SQL DDL | [`sql/deploy_schema.sql`](sql/deploy_schema.sql) | Idempotent — safe to run standalone if a fresh DB needs bootstrapping |
+| SQL structural DDL | [`sql/deploy_schema.sql`](sql/deploy_schema.sql) | Idempotent — tables, views, stored procedure |
+| SQL security DDL | [`sql/deploy_security.sql`](sql/deploy_security.sql) | Idempotent — roles, RLS, user, grants. Run after deploy_schema.sql |
 | Bacpac seed | `infrastructure/exported/DataCycleDB.bacpac` | One-shot data load for a fresh DB |
 | Frozen exports | [`infrastructure/exported/`](infrastructure/exported/) | ARM + Bicep snapshots of the current environment for diffing |
 | Runbook | [`infrastructure/DEPLOY.md`](infrastructure/DEPLOY.md) | Full rebuild procedure |

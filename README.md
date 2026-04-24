@@ -1,78 +1,121 @@
-# ADF_DataCycleProject — Monorepo
+# Bellevue Data Cycle — ADF Monorepo
 
-This repository consolidates all pipeline code for the Bellevue HES-SO data cycle project into a single monorepo.
+A daily data pipeline that ingests building-energy, solar-production, meteorological, and room-booking data from on-premises sources into an **Azure Medallion Lakehouse**, transforms it with Databricks PySpark notebooks, produces ML-based consumption and solar forecasts via a **KNIME Server**, and delivers analytics-ready data to **SAP Analytics Cloud** and **Power BI**.
 
-## Repository Structure
+> **Built for** the HES-SO Bellevue campus energy-monitoring project.
+
+---
+
+## What this pipeline does
+
+```
+On-prem VM (SMB / SFTP)
+  ├── Solar inverter logs
+  ├── Room bookings
+  ├── Energy consumption / temperature / humidity
+  └── Meteorological data & future forecasts
+           │
+           │  Self-Hosted Integration Runtime
+           ▼
+  Azure Data Factory  ──▶  ADLS Gen2 Bronze  ──▶  Databricks (Silver → Gold)
+                                                          │
+                                          ┌───────────────┼──────────────────┐
+                                          ▼               ▼                  ▼
+                                    Azure SQL DWH    KNIME Server    SAP Analytics Cloud
+                                    (DevDB Gold)   (GBT forecasts)    + Power BI
+```
+
+Two daily triggers drive the cycle:
+- **07:15** — `PL_Ingest_Bronze` ingests raw files, runs Silver/Gold ETL, exports to SAC
+- **09:30** — `PL_Upload_Pred_Gold` calls KNIME REST endpoints and loads predictions into Gold
+
+---
+
+## Key technologies
+
+| Layer | Technology |
+|---|---|
+| Orchestration | Azure Data Factory (`group3-df`) |
+| Compute | Azure Databricks — 6 PySpark notebooks |
+| Storage | ADLS Gen2 (`bronze`, `silver`, `mldata`, `sacexport`, `config`) |
+| Serving | Azure SQL serverless Gen5 — `DevDB` |
+| ML | KNIME Server — GBT regressors (solar + consumption) |
+| On-prem connectivity | Self-Hosted Integration Runtime on Windows VM |
+| Secrets | Azure Key Vault (`DataCycleGroup3Keys`) |
+| CI/CD | GitHub Actions — ADF validate + deploy (OIDC / UAMI) |
+
+---
+
+## Repository structure
 
 ```
 ADF_DataCycleProject/
 │
-├── adf/                          # Azure Data Factory artifacts
-│   ├── dataset/                  # ADF dataset definitions (26 files)
-│   ├── factory/                  # ADF factory definition
-│   ├── integrationRuntime/       # Self-hosted integration runtime configs
-│   ├── linkedService/            # ADF linked service definitions (11 files)
-│   ├── pipeline/                 # ADF pipeline definitions (9 files)
-│   └── trigger/                  # ADF schedule triggers
+├── adf/                              # Azure Data Factory source JSON
+│   ├── factory/group3-df.json        # Factory definition
+│   ├── linkedService/                # 10 linked services (ADLS, SQL, KV, SHIR, Databricks…)
+│   ├── dataset/                      # 19 datasets
+│   ├── pipeline/                     # 9 pipelines
+│   ├── trigger/                      # 2 daily triggers (07:15 / 09:30)
+│   ├── integrationRuntime/           # 1 self-hosted IR
+│   └── publish_config.json
 │
-├── databricks/                   # Databricks notebooks & config
-│   ├── notebooks/                # PySpark ETL notebooks
-│   │   ├── silver_transformation.py      # Bronze → Silver ETL
-│   │   ├── silver_gold_dimensions.py     # Silver → Gold dimensions (MERGE)
-│   │   ├── silver_gold_facts.py          # Silver → Gold fact tables (incremental)
-│   │   ├── ml_export_to_knime.py         # Feature engineering → KNIME CSV export
-│   │   ├── ml_load_predictions.py        # KNIME predictions → Gold DWH
-│   │   └── sac_export_to_adls.py         # Gold views → SAP Analytics Cloud CSV
-│   ├── cluster_configs/          # Databricks cluster configuration files
-│   └── jobs/                     # Databricks job definitions
+├── databricks/
+│   └── notebooks/                    # 6 PySpark ETL notebooks
+│       ├── silver_transformation.py        # Bronze → Silver (UTF-16, unpivot, GDPR)
+│       ├── silver_gold_dimensions.py       # Silver → Gold dimension MERGE
+│       ├── silver_gold_facts.py            # Silver → Gold facts (incremental watermark)
+│       ├── ml_export_to_knime.py           # Feature engineering → KNIME CSV
+│       ├── ml_load_predictions.py          # KNIME output → fact_energy_prediction
+│       └── sac_export_to_adls.py           # Gold views → SAC flat CSV
 │
-├── infrastructure/               # IaC templates (ARM / Bicep / Terraform)
-├── sql/                          # Azure SQL DDL scripts (tables, views, procedures)
+├── config/                           # Runtime config files (also in ADLS /config/)
+│   ├── ml_models_config.json
+│   └── electricity_tariff_config.json
+│
+├── sql/
+│   └── deploy_schema.sql             # Idempotent DDL — dims, facts, views, stored procs
+│
+├── dashboards/
+│   └── PowerBy_RoomOccupacy.pbit     # Power BI template — room occupancy
+│
+├── infrastructure/                   # IaC (Bicep) — wired separately, see docs
+│   ├── main.bicep
+│   ├── modules/                      # 8 Bicep modules
+│   ├── parameters/dev.parameters.json
+│   ├── exported/                     # Frozen ARM + Bicep snapshots of current env
+│   ├── future/workflows/             # deploy-dev.yml / destroy-dev.yml (unwired)
+│   └── DEPLOY.md                     # Full-rebuild runbook
+│
 ├── scripts/
-│   └── export/                   # Utility export scripts
-├── .github/
-│   └── workflows/                # CI/CD GitHub Actions workflows
-├── docs/                         # Project documentation
+│   └── deploy_databricks.sh          # Idempotent Databricks provisioning
 │
-├── publish_config.json           # ADF Git integration config (root — required by ADF)
-└── README.md
+├── docs/
+│   ├── TECHNICAL_GUIDE.md            # Full architecture & operational reference
+│   └── TODO.md
+│
+└── .github/
+    ├── workflows/
+    │   ├── validate.yml              # PR gate — ADF JSON consistency check
+    │   └── deploy-adf.yml            # Push-to-main — ARM export + ADF deploy
+    └── dependabot.yml
 ```
 
-## Components
+---
 
-### Azure Data Factory (`adf/`)
-All ADF factory artifacts (pipelines, datasets, linked services, triggers, integration runtimes) are stored under `adf/`. After merging, reconfigure ADF Studio Git integration to use `/adf` as the root folder.
+## Documentation
 
-**Pipelines:**
-- `PL_Ingest_Bronze` — Main orchestrator: ingests all raw sources into Bronze layer, then triggers Silver/Gold transformation via Databricks
-- `PL_Bronze_Bookings`, `PL_Bronze_Conso`, `PL_Bronze_Meteo`, `PL_Bronze_MeteoFuture`, `PL_Bronze_Solar` — Source-specific Bronze ingestion
-- `PL_SAC_Export` — Exports Gold views to ADLS for SAP Analytics Cloud
-- `PL_Upload_Pred_Gold` — Loads KNIME ML predictions into Gold DWH
-- `Run_Knime` — Triggers KNIME workflow execution
+- [Technical Guide](docs/TECHNICAL_GUIDE.md) — deep-dive on every component: pipelines, notebooks, SQL schema, ML lifecycle, CI/CD, secrets, IaC, and operational runbook.
+- [Infrastructure Deploy Runbook](infrastructure/DEPLOY.md) — full from-scratch rebuild procedure (Bicep + OIDC + bacpac + SHIR).
+- [Wiki](https://github.com/sandersdHES/ADF_DataCycleProject/wiki) — browsable reference pages: architecture, data sources, pipeline catalog, notebook reference, DWH schema, ML lifecycle, CI/CD, operational runbook, and more.
 
-### Databricks Notebooks (`databricks/notebooks/`)
-PySpark notebooks executed by ADF via the Databricks linked service. Notebook paths reference this monorepo under `/Repos/dylan.sanderso@hes-so.ch/ADF_DataCycleProject/databricks/notebooks/`.
+---
 
-| Notebook | ADF Pipeline | Description |
+## CI/CD at a glance
+
+| Workflow | Trigger | What it does |
 |---|---|---|
-| `silver_transformation.py` | `PL_Ingest_Bronze` | Bronze → Silver ETL (UTF-16, solar unpivot, GDPR masking) |
-| `silver_gold_dimensions.py` | `PL_Ingest_Bronze` | Populates Gold dimension tables via MERGE |
-| `silver_gold_facts.py` | `PL_Ingest_Bronze` | Incremental load of Gold fact tables via watermark |
-| `ml_export_to_knime.py` | `PL_Ingest_Bronze` | Feature engineering for US#29 / US#30 ML models |
-| `ml_load_predictions.py` | `PL_Upload_Pred_Gold` | Loads KNIME predictions into `fact_energy_prediction` |
-| `sac_export_to_adls.py` | `PL_SAC_Export` | Exports Gold views to flat CSV for SAC upload |
+| `validate.yml` | Pull request touching `adf/**` | Validates ADF source JSON consistency |
+| `deploy-adf.yml` | Push to `main` | Exports ARM from source JSON, deploys to `group3-df` |
 
-## Post-Merge ADF Studio Steps
-
-1. In ADF Studio → **Manage → Git configuration**, change the **Root folder** from `/` to `/adf`
-2. Verify all pipelines, datasets and linked services are visible
-3. Update the Databricks Repos path in your workspace to point to this monorepo
-
-## Data Architecture
-
-```
-Bronze (ADLS)  →  Silver (ADLS Parquet)  →  Gold (Azure SQL DWH)  →  SAC / Power BI
-     ↑                    ↑                         ↑
-  ADF Copy            Databricks               Databricks
-  Activities          PySpark ETL              JDBC append
-```
+Authentication uses a **User-Assigned Managed Identity** (`gh-datacycle-oidc`) via OIDC — no client secrets stored in GitHub. See the [Technical Guide §9](docs/TECHNICAL_GUIDE.md) for setup details.
