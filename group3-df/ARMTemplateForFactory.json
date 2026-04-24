@@ -4,20 +4,20 @@
 	"parameters": {
 		"factoryName": {
 			"type": "string",
-			"metadata": "Nom de fabrique de données",
+			"metadata": "Data Factory name",
 			"defaultValue": "group3-df"
 		},
 		"LS_ADLS_Bronze_accountKey": {
 			"type": "secureString",
-			"metadata": "Chaîne sécurisée pour « accountKey » de « LS_ADLS_Bronze »"
+			"metadata": "Secure string for 'accountKey' of 'LS_ADLS_Bronze'"
 		},
 		"LS_AzureFileShare_SAC_connectionString": {
 			"type": "secureString",
-			"metadata": "Chaîne sécurisée pour « connectionString » de « LS_AzureFileShare_SAC »"
+			"metadata": "Secure string for 'connectionString' of 'LS_AzureFileShare_SAC'"
 		},
 		"LS_Databricks_Silver_accessToken": {
 			"type": "secureString",
-			"metadata": "Chaîne sécurisée pour « accessToken » de « LS_Databricks_Silver »"
+			"metadata": "Secure string for 'accessToken' of 'LS_Databricks_Silver'"
 		},
 		"AzureDatabricks_properties_typeProperties_existingClusterId": {
 			"type": "string",
@@ -1461,7 +1461,7 @@
 											"Content-Type": "application/json"
 										},
 										"url": "https://api.edu-hub.knime.com/deployments/rest:509f9c76-1fd3-444d-80a6-4df7848b1621/execution",
-										"body": {},
+										"body": "{}",
 										"authentication": {
 											"type": "Basic",
 											"username": "N8XZA3zjIJVLk-P2XxLKBkLv1_aT-bX302wwgIGOmrY",
@@ -1504,7 +1504,7 @@
 								"Content-Type": "application/json"
 							},
 							"url": "https://api.edu-hub.knime.com/deployments/rest:348633fa-f10f-4a27-99de-11e1707190cb/execution",
-							"body": {},
+							"body": "{}",
 							"authentication": {
 								"type": "Basic",
 								"username": "N8XZA3zjIJVLk-P2XxLKBkLv1_aT-bX302wwgIGOmrY",
@@ -1544,7 +1544,7 @@
 								"Content-Type": "application/json"
 							},
 							"url": "https://api.edu-hub.knime.com/deployments/rest:eb96aa91-239b-4cf2-8c7e-a8a40516d4f3/execution",
-							"body": {},
+							"body": "{}",
 							"authentication": {
 								"type": "Basic",
 								"username": "N8XZA3zjIJVLk-P2XxLKBkLv1_aT-bX302wwgIGOmrY",
@@ -1577,7 +1577,7 @@
 								"Content-Type": "application/json"
 							},
 							"url": "https://api.edu-hub.knime.com/deployments/rest:e481f0fd-89ba-409a-aaa2-d8a648956949/execution",
-							"body": {},
+							"body": "{}",
 							"authentication": {
 								"type": "Basic",
 								"username": "N8XZA3zjIJVLk-P2XxLKBkLv1_aT-bX302wwgIGOmrY",
@@ -2551,6 +2551,18 @@
 			"properties": {
 				"type": "SelfHosted",
 				"typeProperties": {}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/gh-datacycle-oidc')]",
+			"type": "Microsoft.DataFactory/factories/credentials",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"type": "ManagedIdentity",
+				"typeProperties": {
+					"resourceId": "/subscriptions/852f0176-1826-4957-a7fc-b1cd7e7aac73/resourceGroups/datafactory-rg505/providers/Microsoft.ManagedIdentity/userAssignedIdentities/gh-datacycle-oidc"
+				}
 			},
 			"dependsOn": []
 		}

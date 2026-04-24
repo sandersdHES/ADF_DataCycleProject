@@ -4,20 +4,20 @@
 	"parameters": {
 		"factoryName": {
 			"type": "string",
-			"metadata": "Nom de fabrique de données",
+			"metadata": "Data Factory name",
 			"defaultValue": "group3-df"
 		},
 		"LS_ADLS_Bronze_accountKey": {
 			"type": "secureString",
-			"metadata": "Chaîne sécurisée pour « accountKey » de « LS_ADLS_Bronze »"
+			"metadata": "Secure string for 'accountKey' of 'LS_ADLS_Bronze'"
 		},
 		"LS_AzureFileShare_SAC_connectionString": {
 			"type": "secureString",
-			"metadata": "Chaîne sécurisée pour « connectionString » de « LS_AzureFileShare_SAC »"
+			"metadata": "Secure string for 'connectionString' of 'LS_AzureFileShare_SAC'"
 		},
 		"LS_Databricks_Silver_accessToken": {
 			"type": "secureString",
-			"metadata": "Chaîne sécurisée pour « accessToken » de « LS_Databricks_Silver »"
+			"metadata": "Secure string for 'accessToken' of 'LS_Databricks_Silver'"
 		},
 		"AzureDatabricks_properties_typeProperties_existingClusterId": {
 			"type": "string",
@@ -77,11 +77,11 @@
 		},
 		"containerUri": {
 			"type": "string",
-			"metadata": "URI pour le compte de stockage contenant des modèles ARM liés"
+			"metadata": "URI to storage account containing linked ARM templates"
 		},
 		"containerSasToken": {
 			"type": "string",
-			"metadata": "Jeton SAS pour le compte de stockage contenant des modèles ARM liés"
+			"metadata": "Sas token to storage account containing linked ARM templates"
 		}
 	},
 	"variables": {
