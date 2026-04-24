@@ -20,7 +20,7 @@ jobs:
     name: ADF JSON validate
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       # Validates that ADF source JSON in adf/ is internally consistent (no dangling
       # references between pipelines, datasets, linked services, triggers).
