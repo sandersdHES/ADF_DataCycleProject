@@ -7,13 +7,10 @@
 			"metadata": "Data Factory name",
 			"defaultValue": "group3-df"
 		},
-		"LS_ADLS_Bronze_accountKey": {
-			"type": "secureString",
-			"metadata": "Secure string for 'accountKey' of 'LS_ADLS_Bronze'"
-		},
 		"LS_AzureFileShare_SAC_connectionString": {
 			"type": "secureString",
-			"metadata": "Secure string for 'connectionString' of 'LS_AzureFileShare_SAC'"
+			"metadata": "Secure string for 'connectionString' of 'LS_AzureFileShare_SAC'",
+			"defaultValue": "DefaultEndpointsProtocol=https;AccountName=adlsbellevuegrp3;EndpointSuffix=core.windows.net;"
 		},
 		"LS_Databricks_Silver_accessToken": {
 			"type": "secureString",
@@ -102,41 +99,20 @@
 					"factoryName": {
 						"value": "[parameters('factoryName')]"
 					},
-					"LS_ADLS_Bronze_accountKey": {
-						"value": "[parameters('LS_ADLS_Bronze_accountKey')]"
+					"LS_Databricks_Silver_accessToken": {
+						"value": "[parameters('LS_Databricks_Silver_accessToken')]"
 					},
 					"LS_AzureFileShare_SAC_connectionString": {
 						"value": "[parameters('LS_AzureFileShare_SAC_connectionString')]"
 					},
-					"LS_Databricks_Silver_accessToken": {
-						"value": "[parameters('LS_Databricks_Silver_accessToken')]"
-					},
-					"LS_ADLS_Bronze_properties_typeProperties_url": {
-						"value": "[parameters('LS_ADLS_Bronze_properties_typeProperties_url')]"
-					},
 					"LS_AKV_properties_typeProperties_baseUrl": {
 						"value": "[parameters('LS_AKV_properties_typeProperties_baseUrl')]"
-					}
-				}
-			},
-			"dependsOn": []
-		},
-		{
-			"name": "group3-df_ArmTemplate_1",
-			"type": "Microsoft.Resources/deployments",
-			"apiVersion": "2024-03-01",
-			"properties": {
-				"mode": "incremental",
-				"templateLink": {
-					"uri": "[concat(parameters('containerUri'), '/ArmTemplate_1.json', parameters('containerSasToken'))]",
-					"contentVersion": "1.0.0.0"
-				},
-				"parameters": {
-					"factoryName": {
-						"value": "[parameters('factoryName')]"
 					},
 					"AzureDatabricks_properties_typeProperties_existingClusterId": {
 						"value": "[parameters('AzureDatabricks_properties_typeProperties_existingClusterId')]"
+					},
+					"LS_ADLS_Bronze_properties_typeProperties_url": {
+						"value": "[parameters('LS_ADLS_Bronze_properties_typeProperties_url')]"
 					},
 					"LS_BellevueBooking_LocalServer_properties_typeProperties_host": {
 						"value": "[parameters('LS_BellevueBooking_LocalServer_properties_typeProperties_host')]"
@@ -170,6 +146,24 @@
 					},
 					"LS_Solarlogs_LocalServer_properties_typeProperties_userId": {
 						"value": "[parameters('LS_Solarlogs_LocalServer_properties_typeProperties_userId')]"
+					}
+				}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "group3-df_ArmTemplate_1",
+			"type": "Microsoft.Resources/deployments",
+			"apiVersion": "2024-03-01",
+			"properties": {
+				"mode": "incremental",
+				"templateLink": {
+					"uri": "[concat(parameters('containerUri'), '/ArmTemplate_1.json', parameters('containerSasToken'))]",
+					"contentVersion": "1.0.0.0"
+				},
+				"parameters": {
+					"factoryName": {
+						"value": "[parameters('factoryName')]"
 					}
 				}
 			},

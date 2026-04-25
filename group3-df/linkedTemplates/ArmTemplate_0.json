@@ -7,48 +7,76 @@
 			"metadata": "Data Factory name",
 			"defaultValue": "group3-df"
 		},
-		"LS_ADLS_Bronze_accountKey": {
-			"type": "secureString",
-			"metadata": "Secure string for 'accountKey' of 'LS_ADLS_Bronze'"
-		},
-		"LS_AzureFileShare_SAC_connectionString": {
-			"type": "secureString",
-			"metadata": "Secure string for 'connectionString' of 'LS_AzureFileShare_SAC'"
-		},
 		"LS_Databricks_Silver_accessToken": {
 			"type": "secureString",
 			"metadata": "Secure string for 'accessToken' of 'LS_Databricks_Silver'"
+		},
+		"LS_AzureFileShare_SAC_connectionString": {
+			"type": "secureString",
+			"metadata": "Secure string for 'connectionString' of 'LS_AzureFileShare_SAC'",
+			"defaultValue": "DefaultEndpointsProtocol=https;AccountName=adlsbellevuegrp3;EndpointSuffix=core.windows.net;"
+		},
+		"LS_AKV_properties_typeProperties_baseUrl": {
+			"type": "string",
+			"defaultValue": "https://DataCycleGroup3Keys.vault.azure.net/"
+		},
+		"AzureDatabricks_properties_typeProperties_existingClusterId": {
+			"type": "string",
+			"defaultValue": "0223-115927-nvtos4a4"
 		},
 		"LS_ADLS_Bronze_properties_typeProperties_url": {
 			"type": "string",
 			"defaultValue": "https://adlsbellevuegrp3.dfs.core.windows.net/"
 		},
-		"LS_AKV_properties_typeProperties_baseUrl": {
+		"LS_BellevueBooking_LocalServer_properties_typeProperties_host": {
 			"type": "string",
-			"defaultValue": "https://DataCycleGroup3Keys.vault.azure.net/"
+			"defaultValue": "\\\\10.130.25.152\\BellevueBooking"
+		},
+		"LS_BellevueBooking_LocalServer_properties_typeProperties_userId": {
+			"type": "string",
+			"defaultValue": "Student"
+		},
+		"LS_BellevueConso_LocalServer_properties_typeProperties_host": {
+			"type": "string",
+			"defaultValue": "\\\\10.130.25.152\\BellevueConso"
+		},
+		"LS_BellevueConso_LocalServer_properties_typeProperties_userId": {
+			"type": "string",
+			"defaultValue": "Student"
+		},
+		"LS_DevDB_Gold_properties_typeProperties_server": {
+			"type": "string",
+			"defaultValue": "sqlserver-bellevue-grp3.database.windows.net"
+		},
+		"LS_DevDB_Gold_properties_typeProperties_database": {
+			"type": "string",
+			"defaultValue": "DevDB"
+		},
+		"LS_DevDB_Gold_properties_typeProperties_userName": {
+			"type": "string",
+			"defaultValue": "dylan.sanderso"
+		},
+		"LS_SFTP_LocalServer_properties_typeProperties_host": {
+			"type": "string",
+			"defaultValue": "10.130.25.152"
+		},
+		"LS_SFTP_LocalServer_properties_typeProperties_userName": {
+			"type": "string",
+			"defaultValue": "Student"
+		},
+		"LS_Solarlogs_LocalServer_properties_typeProperties_host": {
+			"type": "string",
+			"defaultValue": "\\\\10.130.25.152\\Solarlogs"
+		},
+		"LS_Solarlogs_LocalServer_properties_typeProperties_userId": {
+			"type": "string",
+			"defaultValue": "Student"
 		}
 	},
 	"variables": {
 		"factoryId": "[concat('Microsoft.DataFactory/factories/', parameters('factoryName'))]"
 	},
 	"resources": [
-		{
-			"name": "[concat(parameters('factoryName'), '/LS_ADLS_Bronze')]",
-			"type": "Microsoft.DataFactory/factories/linkedServices",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"annotations": [],
-				"type": "AzureBlobFS",
-				"typeProperties": {
-					"url": "[parameters('LS_ADLS_Bronze_properties_typeProperties_url')]",
-					"accountKey": {
-						"type": "SecureString",
-						"value": "[parameters('LS_ADLS_Bronze_accountKey')]"
-					}
-				}
-			},
-			"dependsOn": []
-		},
 		{
 			"name": "[concat(parameters('factoryName'), '/LS_AKV')]",
 			"type": "Microsoft.DataFactory/factories/linkedServices",
@@ -58,20 +86,6 @@
 				"type": "AzureKeyVault",
 				"typeProperties": {
 					"baseUrl": "[parameters('LS_AKV_properties_typeProperties_baseUrl')]"
-				}
-			},
-			"dependsOn": []
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/LS_AzureFileShare_SAC')]",
-			"type": "Microsoft.DataFactory/factories/linkedServices",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"annotations": [],
-				"type": "AzureFileStorage",
-				"typeProperties": {
-					"connectionString": "[parameters('LS_AzureFileShare_SAC_connectionString')]",
-					"fileShare": "sac-export-share"
 				}
 			},
 			"dependsOn": []
@@ -301,6 +315,282 @@
 			]
 		},
 		{
+			"name": "[concat(parameters('factoryName'), '/AzureDatabricks')]",
+			"type": "Microsoft.DataFactory/factories/linkedServices",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"annotations": [],
+				"type": "AzureDatabricks",
+				"typeProperties": {
+					"domain": "https://adb-7405619109510762.2.azuredatabricks.net",
+					"accessToken": {
+						"type": "AzureKeyVaultSecret",
+						"store": {
+							"referenceName": "LS_AKV",
+							"type": "LinkedServiceReference"
+						},
+						"secretName": "Databricks-Access-Token"
+					},
+					"existingClusterId": "[parameters('AzureDatabricks_properties_typeProperties_existingClusterId')]"
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/LS_AKV')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/LS_ADLS_Bronze')]",
+			"type": "Microsoft.DataFactory/factories/linkedServices",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"annotations": [],
+				"type": "AzureBlobFS",
+				"typeProperties": {
+					"url": "[parameters('LS_ADLS_Bronze_properties_typeProperties_url')]",
+					"credential": {
+						"referenceName": "gh-datacycle-oidc",
+						"type": "CredentialReference"
+					}
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/credentials/gh-datacycle-oidc')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/LS_AzureFileShare_SAC')]",
+			"type": "Microsoft.DataFactory/factories/linkedServices",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"annotations": [],
+				"type": "AzureFileStorage",
+				"typeProperties": {
+					"connectionString": "[parameters('LS_AzureFileShare_SAC_connectionString')]",
+					"accountKey": {
+						"type": "AzureKeyVaultSecret",
+						"store": {
+							"referenceName": "LS_AKV",
+							"type": "LinkedServiceReference"
+						},
+						"secretName": "adls-access-key"
+					},
+					"fileShare": "sac-export-share"
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/LS_AKV')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/LS_BellevueBooking_LocalServer')]",
+			"type": "Microsoft.DataFactory/factories/linkedServices",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"annotations": [],
+				"type": "FileServer",
+				"typeProperties": {
+					"host": "[parameters('LS_BellevueBooking_LocalServer_properties_typeProperties_host')]",
+					"userId": "[parameters('LS_BellevueBooking_LocalServer_properties_typeProperties_userId')]",
+					"password": {
+						"type": "AzureKeyVaultSecret",
+						"store": {
+							"referenceName": "LS_AKV",
+							"type": "LinkedServiceReference"
+						},
+						"secretName": "Student-VM-Password"
+					}
+				},
+				"connectVia": {
+					"referenceName": "Group3-VM-Runtime",
+					"type": "IntegrationRuntimeReference"
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/integrationRuntimes/Group3-VM-Runtime')]",
+				"[concat(variables('factoryId'), '/linkedServices/LS_AKV')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/LS_BellevueConso_LocalServer')]",
+			"type": "Microsoft.DataFactory/factories/linkedServices",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"annotations": [],
+				"type": "FileServer",
+				"typeProperties": {
+					"host": "[parameters('LS_BellevueConso_LocalServer_properties_typeProperties_host')]",
+					"userId": "[parameters('LS_BellevueConso_LocalServer_properties_typeProperties_userId')]",
+					"password": {
+						"type": "AzureKeyVaultSecret",
+						"store": {
+							"referenceName": "LS_AKV",
+							"type": "LinkedServiceReference"
+						},
+						"secretName": "Student-VM-Password"
+					}
+				},
+				"connectVia": {
+					"referenceName": "Group3-VM-Runtime",
+					"type": "IntegrationRuntimeReference"
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/integrationRuntimes/Group3-VM-Runtime')]",
+				"[concat(variables('factoryId'), '/linkedServices/LS_AKV')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/LS_DevDB_Gold')]",
+			"type": "Microsoft.DataFactory/factories/linkedServices",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"annotations": [],
+				"type": "AzureSqlDatabase",
+				"typeProperties": {
+					"server": "[parameters('LS_DevDB_Gold_properties_typeProperties_server')]",
+					"database": "[parameters('LS_DevDB_Gold_properties_typeProperties_database')]",
+					"encrypt": "mandatory",
+					"trustServerCertificate": false,
+					"authenticationType": "SQL",
+					"userName": "[parameters('LS_DevDB_Gold_properties_typeProperties_userName')]",
+					"password": {
+						"type": "AzureKeyVaultSecret",
+						"store": {
+							"referenceName": "LS_AKV",
+							"type": "LinkedServiceReference"
+						},
+						"secretName": "Admin-SQL-Password"
+					}
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/LS_AKV')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/LS_SFTP_LocalServer')]",
+			"type": "Microsoft.DataFactory/factories/linkedServices",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"annotations": [],
+				"type": "Sftp",
+				"typeProperties": {
+					"host": "[parameters('LS_SFTP_LocalServer_properties_typeProperties_host')]",
+					"port": 22,
+					"skipHostKeyValidation": true,
+					"authenticationType": "Basic",
+					"userName": "[parameters('LS_SFTP_LocalServer_properties_typeProperties_userName')]",
+					"password": {
+						"type": "AzureKeyVaultSecret",
+						"store": {
+							"referenceName": "LS_AKV",
+							"type": "LinkedServiceReference"
+						},
+						"secretName": "Student-VM-Password"
+					}
+				},
+				"connectVia": {
+					"referenceName": "Group3-VM-Runtime",
+					"type": "IntegrationRuntimeReference"
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/integrationRuntimes/Group3-VM-Runtime')]",
+				"[concat(variables('factoryId'), '/linkedServices/LS_AKV')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/LS_Solarlogs_LocalServer')]",
+			"type": "Microsoft.DataFactory/factories/linkedServices",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"annotations": [],
+				"type": "FileServer",
+				"typeProperties": {
+					"host": "[parameters('LS_Solarlogs_LocalServer_properties_typeProperties_host')]",
+					"userId": "[parameters('LS_Solarlogs_LocalServer_properties_typeProperties_userId')]",
+					"password": {
+						"type": "AzureKeyVaultSecret",
+						"store": {
+							"referenceName": "LS_AKV",
+							"type": "LinkedServiceReference"
+						},
+						"secretName": "Student-VM-Password"
+					}
+				},
+				"connectVia": {
+					"referenceName": "Group3-VM-Runtime",
+					"type": "IntegrationRuntimeReference"
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/integrationRuntimes/Group3-VM-Runtime')]",
+				"[concat(variables('factoryId'), '/linkedServices/LS_AKV')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/PL_Upload_Pred_Gold')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "Load Predictions to Gold",
+						"type": "DatabricksNotebook",
+						"dependsOn": [
+							{
+								"activity": "Knime Run",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"notebookPath": "/Users/dylan.sanderso@hes-so.ch/ADF_DataCycleProject/databricks/notebooks/ml_load_predictions"
+						},
+						"linkedServiceName": {
+							"referenceName": "AzureDatabricks",
+							"type": "LinkedServiceReference"
+						}
+					},
+					{
+						"name": "Knime Run",
+						"type": "ExecutePipeline",
+						"dependsOn": [],
+						"policy": {
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "Run_Knime",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {}
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"annotations": [],
+				"lastPublishTime": "2026-04-16T06:51:50Z"
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/AzureDatabricks')]",
+				"[concat(variables('factoryId'), '/pipelines/Run_Knime')]"
+			]
+		},
+		{
 			"name": "[concat(parameters('factoryName'), '/DS_ADLS_SACStaging')]",
 			"type": "Microsoft.DataFactory/factories/datasets",
 			"apiVersion": "2018-06-01",
@@ -367,6 +657,27 @@
 			]
 		},
 		{
+			"name": "[concat(parameters('factoryName'), '/DS_Vetroz_Booking_Source')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "LS_BellevueBooking_LocalServer",
+					"type": "LinkedServiceReference"
+				},
+				"annotations": [],
+				"type": "Binary",
+				"typeProperties": {
+					"location": {
+						"type": "FileServerLocation"
+					}
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/LS_BellevueBooking_LocalServer')]"
+			]
+		},
+		{
 			"name": "[concat(parameters('factoryName'), '/DS_Vetroz_Conso_Bronze')]",
 			"type": "Microsoft.DataFactory/factories/datasets",
 			"apiVersion": "2018-06-01",
@@ -399,320 +710,24 @@
 			]
 		},
 		{
-			"name": "[concat(parameters('factoryName'), '/DS_Vetroz_FutureForecasts_Bronze')]",
+			"name": "[concat(parameters('factoryName'), '/DS_Vetroz_Conso_Source')]",
 			"type": "Microsoft.DataFactory/factories/datasets",
 			"apiVersion": "2018-06-01",
 			"properties": {
 				"linkedServiceName": {
-					"referenceName": "LS_ADLS_Bronze",
+					"referenceName": "LS_BellevueConso_LocalServer",
 					"type": "LinkedServiceReference"
 				},
 				"annotations": [],
 				"type": "Binary",
 				"typeProperties": {
 					"location": {
-						"type": "AzureBlobFSLocation",
-						"folderPath": "future_forecasts",
-						"fileSystem": "bronze"
+						"type": "FileServerLocation"
 					}
 				}
 			},
 			"dependsOn": [
-				"[concat(variables('factoryId'), '/linkedServices/LS_ADLS_Bronze')]"
-			]
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/DS_Vetroz_Meteo_Bronze')]",
-			"type": "Microsoft.DataFactory/factories/datasets",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"linkedServiceName": {
-					"referenceName": "LS_ADLS_Bronze",
-					"type": "LinkedServiceReference"
-				},
-				"annotations": [],
-				"type": "Binary",
-				"typeProperties": {
-					"location": {
-						"type": "AzureBlobFSLocation",
-						"folderPath": "forecasts",
-						"fileSystem": "bronze"
-					}
-				}
-			},
-			"dependsOn": [
-				"[concat(variables('factoryId'), '/linkedServices/LS_ADLS_Bronze')]"
-			]
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/DS_Vetroz_Solar_Bronze')]",
-			"type": "Microsoft.DataFactory/factories/datasets",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"linkedServiceName": {
-					"referenceName": "LS_ADLS_Bronze",
-					"type": "LinkedServiceReference"
-				},
-				"annotations": [],
-				"type": "Binary",
-				"typeProperties": {
-					"location": {
-						"type": "AzureBlobFSLocation",
-						"folderPath": "solar",
-						"fileSystem": "bronze"
-					}
-				}
-			},
-			"dependsOn": [
-				"[concat(variables('factoryId'), '/linkedServices/LS_ADLS_Bronze')]"
-			]
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/Parquet1')]",
-			"type": "Microsoft.DataFactory/factories/datasets",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"linkedServiceName": {
-					"referenceName": "LS_ADLS_Bronze",
-					"type": "LinkedServiceReference"
-				},
-				"annotations": [],
-				"type": "Parquet",
-				"typeProperties": {
-					"location": {
-						"type": "AzureBlobFSLocation",
-						"folderPath": "solar_inverters",
-						"fileSystem": "silver"
-					},
-					"compressionCodec": "snappy"
-				},
-				"schema": [
-					{
-						"name": "log_timestamp",
-						"type": "INT96"
-					},
-					{
-						"name": "inverter_id",
-						"type": "INT_32"
-					},
-					{
-						"name": "ac_power_w",
-						"type": "INT_32"
-					},
-					{
-						"name": "status_code",
-						"type": "INT_32"
-					},
-					{
-						"name": "is_failure",
-						"type": "BOOLEAN"
-					}
-				]
-			},
-			"dependsOn": [
-				"[concat(variables('factoryId'), '/linkedServices/LS_ADLS_Bronze')]"
-			]
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/Parquet2')]",
-			"type": "Microsoft.DataFactory/factories/datasets",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"linkedServiceName": {
-					"referenceName": "LS_ADLS_Bronze",
-					"type": "LinkedServiceReference"
-				},
-				"annotations": [],
-				"type": "Parquet",
-				"typeProperties": {
-					"location": {
-						"type": "AzureBlobFSLocation",
-						"folderPath": "solar_aggregated",
-						"fileSystem": "silver"
-					},
-					"compressionCodec": "snappy"
-				},
-				"schema": [
-					{
-						"name": "cumulative_reading",
-						"type": "DOUBLE"
-					},
-					{
-						"name": "delta_value",
-						"type": "DOUBLE"
-					},
-					{
-						"name": "timestamp",
-						"type": "INT96"
-					}
-				]
-			},
-			"dependsOn": [
-				"[concat(variables('factoryId'), '/linkedServices/LS_ADLS_Bronze')]"
-			]
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/Parquet3')]",
-			"type": "Microsoft.DataFactory/factories/datasets",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"linkedServiceName": {
-					"referenceName": "LS_ADLS_Bronze",
-					"type": "LinkedServiceReference"
-				},
-				"annotations": [],
-				"type": "Parquet",
-				"typeProperties": {
-					"location": {
-						"type": "AzureBlobFSLocation",
-						"folderPath": "consumption",
-						"fileSystem": "silver"
-					},
-					"compressionCodec": "snappy"
-				},
-				"schema": [
-					{
-						"name": "cumulative_reading",
-						"type": "DOUBLE"
-					},
-					{
-						"name": "delta_value",
-						"type": "DOUBLE"
-					},
-					{
-						"name": "timestamp",
-						"type": "INT96"
-					}
-				]
-			},
-			"dependsOn": [
-				"[concat(variables('factoryId'), '/linkedServices/LS_ADLS_Bronze')]"
-			]
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/Parquet4')]",
-			"type": "Microsoft.DataFactory/factories/datasets",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"linkedServiceName": {
-					"referenceName": "LS_ADLS_Bronze",
-					"type": "LinkedServiceReference"
-				},
-				"annotations": [],
-				"type": "Parquet",
-				"typeProperties": {
-					"location": {
-						"type": "AzureBlobFSLocation",
-						"folderPath": "temperature",
-						"fileSystem": "silver"
-					},
-					"compressionCodec": "snappy"
-				},
-				"schema": [
-					{
-						"name": "actual_temp",
-						"type": "DOUBLE"
-					},
-					{
-						"name": "temp_variation",
-						"type": "DOUBLE"
-					},
-					{
-						"name": "timestamp",
-						"type": "INT96"
-					}
-				]
-			},
-			"dependsOn": [
-				"[concat(variables('factoryId'), '/linkedServices/LS_ADLS_Bronze')]"
-			]
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/Parquet5')]",
-			"type": "Microsoft.DataFactory/factories/datasets",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"linkedServiceName": {
-					"referenceName": "LS_ADLS_Bronze",
-					"type": "LinkedServiceReference"
-				},
-				"annotations": [],
-				"type": "Parquet",
-				"typeProperties": {
-					"location": {
-						"type": "AzureBlobFSLocation",
-						"folderPath": "humidity",
-						"fileSystem": "silver"
-					},
-					"compressionCodec": "snappy"
-				},
-				"schema": [
-					{
-						"name": "actual_humidity",
-						"type": "DOUBLE"
-					},
-					{
-						"name": "humidity_variation",
-						"type": "DOUBLE"
-					},
-					{
-						"name": "timestamp",
-						"type": "INT96"
-					}
-				]
-			},
-			"dependsOn": [
-				"[concat(variables('factoryId'), '/linkedServices/LS_ADLS_Bronze')]"
-			]
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/Parquet6')]",
-			"type": "Microsoft.DataFactory/factories/datasets",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"linkedServiceName": {
-					"referenceName": "LS_ADLS_Bronze",
-					"type": "LinkedServiceReference"
-				},
-				"annotations": [],
-				"type": "Parquet",
-				"typeProperties": {
-					"location": {
-						"type": "AzureBlobFSLocation",
-						"folderPath": "weather_forecasts",
-						"fileSystem": "silver"
-					},
-					"compressionCodec": "snappy"
-				},
-				"schema": [
-					{
-						"name": "Time",
-						"type": "INT96"
-					},
-					{
-						"name": "Measurement",
-						"type": "UTF8"
-					},
-					{
-						"name": "Prediction",
-						"type": "INT_32"
-					},
-					{
-						"name": "Unit",
-						"type": "UTF8"
-					},
-					{
-						"name": "Value",
-						"type": "DOUBLE"
-					},
-					{
-						"name": "Site",
-						"type": "UTF8"
-					}
-				]
-			},
-			"dependsOn": [
-				"[concat(variables('factoryId'), '/linkedServices/LS_ADLS_Bronze')]"
+				"[concat(variables('factoryId'), '/linkedServices/LS_BellevueConso_LocalServer')]"
 			]
 		}
 	]

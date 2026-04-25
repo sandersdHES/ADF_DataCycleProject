@@ -7,13 +7,10 @@
 			"metadata": "Data Factory name",
 			"defaultValue": "group3-df"
 		},
-		"LS_ADLS_Bronze_accountKey": {
-			"type": "secureString",
-			"metadata": "Secure string for 'accountKey' of 'LS_ADLS_Bronze'"
-		},
 		"LS_AzureFileShare_SAC_connectionString": {
 			"type": "secureString",
-			"metadata": "Secure string for 'connectionString' of 'LS_AzureFileShare_SAC'"
+			"metadata": "Secure string for 'connectionString' of 'LS_AzureFileShare_SAC'",
+			"defaultValue": "DefaultEndpointsProtocol=https;AccountName=adlsbellevuegrp3;EndpointSuffix=core.windows.net;"
 		},
 		"LS_Databricks_Silver_accessToken": {
 			"type": "secureString",
@@ -2282,13 +2279,15 @@
 				"type": "AzureBlobFS",
 				"typeProperties": {
 					"url": "[parameters('LS_ADLS_Bronze_properties_typeProperties_url')]",
-					"accountKey": {
-						"type": "SecureString",
-						"value": "[parameters('LS_ADLS_Bronze_accountKey')]"
+					"credential": {
+						"referenceName": "gh-datacycle-oidc",
+						"type": "CredentialReference"
 					}
 				}
 			},
-			"dependsOn": []
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/credentials/gh-datacycle-oidc')]"
+			]
 		},
 		{
 			"name": "[concat(parameters('factoryName'), '/LS_AKV')]",
@@ -2312,10 +2311,20 @@
 				"type": "AzureFileStorage",
 				"typeProperties": {
 					"connectionString": "[parameters('LS_AzureFileShare_SAC_connectionString')]",
+					"accountKey": {
+						"type": "AzureKeyVaultSecret",
+						"store": {
+							"referenceName": "LS_AKV",
+							"type": "LinkedServiceReference"
+						},
+						"secretName": "adls-access-key"
+					},
 					"fileShare": "sac-export-share"
 				}
 			},
-			"dependsOn": []
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/LS_AKV')]"
+			]
 		},
 		{
 			"name": "[concat(parameters('factoryName'), '/LS_BellevueBooking_LocalServer')]",

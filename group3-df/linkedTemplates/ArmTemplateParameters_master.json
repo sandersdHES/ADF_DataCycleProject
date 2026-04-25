@@ -5,11 +5,8 @@
 		"factoryName": {
 			"value": "group3-df"
 		},
-		"LS_ADLS_Bronze_accountKey": {
-			"value": ""
-		},
 		"LS_AzureFileShare_SAC_connectionString": {
-			"value": ""
+			"value": "DefaultEndpointsProtocol=https;AccountName=adlsbellevuegrp3;EndpointSuffix=core.windows.net;"
 		},
 		"LS_Databricks_Silver_accessToken": {
 			"value": ""
