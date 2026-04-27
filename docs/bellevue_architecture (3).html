@@ -1,0 +1,990 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Bellevue Data Cycle — Live Architecture</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Space+Grotesk:wght@300;400;500;700&display=swap" rel="stylesheet">
+<style>
+  /* ============================================================
+     COLOR SYSTEM — mapped to Architecture.md classDef palette
+     ============================================================ */
+  :root {
+    --c-src:    #1976D2;
+    --c-shir:   #EF6C00;
+    --c-adf:    #0277BD;
+    --c-bronze: #E65100;
+    --c-silver: #90A4AE;
+    --c-gold:   #FFA000;
+    --c-dbx:    #C62828;
+    --c-ml:     #7B1FA2;
+    --c-serve:  #2E7D32;
+    --c-sec:    #F57F17;
+
+    --bg-0: #07090d;
+    --bg-1: #0d1117;
+    --bg-2: #161b22;
+    --line: #21262d;
+    --line-strong: #30363d;
+    --txt-0: #e6edf3;
+    --txt-1: #8b949e;
+    --txt-2: #6e7681;
+
+    --duration: 6s;
+  }
+
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--bg-0);
+    color: var(--txt-0);
+    font-family: 'Space Grotesk', system-ui, sans-serif;
+    min-height: 100vh;
+  }
+
+  body::before {
+    content: "";
+    position: fixed; inset: 0;
+    background-image:
+      radial-gradient(circle at 1px 1px, rgba(255,255,255,0.035) 1px, transparent 0);
+    background-size: 24px 24px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .page {
+    position: relative;
+    z-index: 1;
+    padding: 24px clamp(16px, 3vw, 40px) 40px;
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+
+  /* ============================================================
+     HEADER
+     ============================================================ */
+  header {
+    display: flex; align-items: flex-end; justify-content: space-between;
+    flex-wrap: wrap; gap: 16px;
+    margin-bottom: 22px; padding-bottom: 16px;
+    border-bottom: 1px solid var(--line);
+  }
+  header h1 {
+    margin: 0;
+    font-weight: 300; font-size: clamp(22px, 2.4vw, 30px);
+    letter-spacing: -0.02em;
+  }
+  header h1 b {
+    font-weight: 700;
+    background: linear-gradient(90deg, var(--c-bronze), var(--c-gold), var(--c-ml));
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  header .sub {
+    color: var(--txt-1); font-size: 12px; margin-top: 6px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  header .meta {
+    text-align: right; color: var(--txt-2); font-size: 11px;
+    font-family: 'JetBrains Mono', monospace; line-height: 1.7;
+  }
+  header .meta span { color: var(--txt-1); }
+  header .meta b { color: var(--txt-0); font-weight: 500; }
+
+  /* ============================================================
+     CONTROL BAR
+     ============================================================ */
+  .controls {
+    display: flex; gap: 12px; align-items: center;
+    flex-wrap: wrap;
+    background: var(--bg-1);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 10px 16px;
+    margin-bottom: 20px;
+  }
+  .controls .group { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .controls .sep { width: 1px; height: 22px; background: var(--line-strong); }
+
+  button.trigger {
+    background: var(--bg-2);
+    border: 1px solid var(--line-strong);
+    color: var(--txt-0);
+    padding: 9px 14px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11.5px; font-weight: 500;
+    letter-spacing: 0.04em;
+    transition: all 0.18s ease;
+    display: flex; align-items: center; gap: 8px;
+  }
+  button.trigger:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+  }
+  button.trigger:disabled { opacity: 0.4; cursor: not-allowed; }
+  button.trigger .dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: currentColor; box-shadow: 0 0 8px currentColor;
+  }
+  button#btn-ingest { color: var(--c-adf); border-color: rgba(2,119,189,0.4); }
+  button#btn-ingest:hover:not(:disabled) { background: rgba(2,119,189,0.12); border-color: var(--c-adf); }
+  button#btn-ml { color: var(--c-ml); border-color: rgba(123,31,162,0.4); }
+  button#btn-ml:hover:not(:disabled) { background: rgba(123,31,162,0.12); border-color: var(--c-ml); }
+  button#btn-stop:hover:not(:disabled) { background: rgba(255,255,255,0.04); }
+
+  .speed {
+    display: flex; align-items: center; gap: 10px;
+    color: var(--txt-1); font-size: 11px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .speed input[type=range] { cursor: pointer; accent-color: var(--c-gold); width: 100px; }
+
+  /* ============================================================
+     RESPONSIVE STAGE  — author at 1280×920, scale to fit
+     ============================================================ */
+  .stage-wrap {
+    width: 100%;
+    height: calc(920px * var(--scale, 1));
+    position: relative;
+    overflow: visible;
+  }
+  .stage {
+    position: absolute;
+    top: 0; left: 0;
+    width: 1280px;
+    height: 920px;
+    transform-origin: top left;
+    transform: scale(var(--scale, 1));
+    background: var(--bg-1);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    overflow: hidden;
+  }
+
+  /* Lane labels on the left */
+  .lane-labels {
+    position: absolute; left: 0; top: 0; bottom: 0; width: 110px;
+    border-right: 1px dashed var(--line-strong);
+    z-index: 1;
+  }
+  .lane {
+    position: absolute; left: 0; right: 0;
+    border-bottom: 1px dashed rgba(48,54,61,0.5);
+    color: var(--txt-2);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    padding: 6px 10px;
+    text-align: right;
+  }
+  .lane span { display: block; line-height: 1.2; }
+  .lane b { color: var(--txt-1); font-weight: 500; }
+
+  /* Generous lane heights — total 920 px */
+  .lane.l-src    { top:   0px; height: 110px; }
+  .lane.l-shir   { top: 110px; height:  80px; }
+  .lane.l-adf    { top: 190px; height:  80px; }
+  .lane.l-bronze { top: 270px; height: 130px; }
+  .lane.l-dbx    { top: 400px; height:  80px; }
+  .lane.l-silver { top: 480px; height:  80px; }
+  .lane.l-gold   { top: 560px; height: 200px; }
+  .lane.l-serve  { top: 760px; height: 160px; border-bottom: none; }
+
+  .diagram {
+    position: absolute;
+    left: 110px; right: 0; top: 0; bottom: 0;
+    z-index: 2;
+  }
+
+  svg.wires {
+    position: absolute; inset: 0;
+    width: 100%; height: 100%;
+    pointer-events: none;
+    z-index: 1;
+  }
+  .wires path {
+    fill: none;
+    stroke: var(--line-strong);
+    stroke-width: 1.5;
+    stroke-dasharray: 3 4;
+    opacity: 0.7;
+  }
+  .wires path.solid { stroke-dasharray: none; stroke-width: 2; opacity: 0.85; }
+  .wires path.dotted { stroke-dasharray: 1 5; opacity: 0.5; }
+  .wires path.ml-edge { stroke: var(--c-ml); opacity: 0.65; stroke-dasharray: 6 4; }
+  .wires path.ml-edge-solid { stroke: var(--c-ml); opacity: 0.7; fill: none; stroke-width: 2; }
+
+  /* ============================================================
+     NODES
+     ============================================================ */
+  .node {
+    position: absolute;
+    background: var(--bg-2);
+    border: 1.5px solid var(--line-strong);
+    border-radius: 8px;
+    padding: 8px 11px;
+    z-index: 3;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  }
+  .node .title {
+    font-size: 11.5px;
+    font-weight: 600;
+    letter-spacing: -0.005em;
+    line-height: 1.2;
+    margin-bottom: 3px;
+    display: flex; align-items: center; gap: 6px;
+    color: var(--txt-0);
+  }
+  .node .title .ico { font-size: 13px; }
+  .node .desc {
+    font-size: 9.5px;
+    color: var(--txt-1);
+    font-family: 'JetBrains Mono', monospace;
+    line-height: 1.35;
+  }
+  .node.active {
+    transform: translateY(-1px);
+    box-shadow: 0 0 0 1px currentColor, 0 6px 20px -8px currentColor;
+  }
+  .node.active .title { color: currentColor; }
+
+  .node.n-src    { color: var(--c-src);    border-color: rgba(25,118,210,0.45); }
+  .node.n-shir   { color: var(--c-shir);   border-color: rgba(239,108,0,0.45); }
+  .node.n-adf    { color: var(--c-adf);    border-color: rgba(2,119,189,0.5); }
+  .node.n-bronze { color: var(--c-bronze); border-color: rgba(230,81,0,0.5); }
+  .node.n-dbx    { color: var(--c-dbx);    border-color: rgba(198,40,40,0.5); }
+  .node.n-silver { color: var(--c-silver); border-color: rgba(144,164,174,0.4); }
+  .node.n-gold   { color: var(--c-gold);   border-color: rgba(255,160,0,0.55); }
+  .node.n-ml     { color: var(--c-ml);     border-color: rgba(123,31,162,0.5); }
+  .node.n-serve  { color: var(--c-serve);  border-color: rgba(46,125,50,0.5); }
+  .node.n-sec    { color: var(--c-sec);    border-color: rgba(245,127,23,0.4); background: rgba(245,127,23,0.04); }
+
+  .node.store::before {
+    content: "";
+    position: absolute; top: -2px; left: 8px; right: 8px; height: 3px;
+    background: currentColor; opacity: 0.6;
+    border-radius: 2px;
+  }
+
+  .group-box {
+    position: absolute;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: rgba(255,255,255,0.012);
+    z-index: 1;
+  }
+  .group-box .group-label {
+    position: absolute; top: -9px; left: 12px;
+    background: var(--bg-1);
+    padding: 1px 10px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--txt-1);
+  }
+
+  /* ============================================================
+     ANIMATED PACKETS — coordinates in DIAGRAM space (1170 × 920)
+     ============================================================ */
+  .packet {
+    position: absolute;
+    width: 11px; height: 11px;
+    border-radius: 50%;
+    margin: -5.5px 0 0 -5.5px;
+    background: var(--c-src);
+    box-shadow: 0 0 12px 2px currentColor;
+    color: var(--c-src);
+    z-index: 50;
+    pointer-events: none;
+  }
+  .packet.kind-ingest { animation: flow-ingest var(--duration) cubic-bezier(0.4, 0, 0.6, 1) forwards; }
+  .packet.kind-ingest-booking { animation: flow-ingest-booking var(--duration) cubic-bezier(0.4, 0, 0.6, 1) forwards; }
+  .packet.kind-ingest-conso   { animation: flow-ingest-conso   var(--duration) cubic-bezier(0.4, 0, 0.6, 1) forwards; }
+  .packet.kind-ingest-solar   { animation: flow-ingest-solar   var(--duration) cubic-bezier(0.4, 0, 0.6, 1) forwards; }
+  .packet.kind-ingest-meteo   { animation: flow-ingest-meteo   var(--duration) cubic-bezier(0.4, 0, 0.6, 1) forwards; }
+  .packet.kind-ml     { animation: flow-ml     var(--duration) cubic-bezier(0.4, 0, 0.6, 1) forwards; }
+
+  .pulse {
+    position: absolute;
+    width: 14px; height: 14px;
+    margin: -7px 0 0 -7px;
+    border-radius: 50%;
+    border: 2px solid currentColor;
+    z-index: 49;
+    animation: pulse-ring 0.8s ease-out forwards;
+    pointer-events: none;
+  }
+  @keyframes pulse-ring {
+    0%   { transform: scale(0.6); opacity: 0.9; }
+    100% { transform: scale(3.5); opacity: 0; }
+  }
+
+  /* 07:15 INGEST — 4 source-specific paths, each routed through ITS own
+     PL_Bronze_* sub-pipeline before merging into the central Bronze spine.
+     Sub-pipeline X centers:  Solar=200  Bookings=380  Conso=560  Meteo=740
+     Source X centers:        Booking=95  Conso=255  Solarlogs=415  Meteo=575
+     Sub-pipelines Y center ≈ 320, Bronze store center ≈ 380                 */
+
+  @keyframes flow-ingest-booking {
+    0%   { left:  95px; top:  55px; opacity: 0; transform: scale(0.4); color: var(--c-src);    background: var(--c-src); }
+    4%   { opacity: 1; transform: scale(1); }
+    13%  { left: 510px; top: 145px; color: var(--c-shir);   background: var(--c-shir); }
+    24%  { left: 510px; top: 225px; color: var(--c-adf);    background: var(--c-adf); transform: scale(1.15); }
+    34%  { left: 380px; top: 320px; color: var(--c-adf);    background: var(--c-adf); transform: scale(1.2); } /* PL_Bronze_Bookings */
+    44%  { left: 510px; top: 380px; color: var(--c-bronze); background: var(--c-bronze); transform: scale(1.25); }
+    54%  { left: 510px; top: 435px; color: var(--c-dbx);    background: var(--c-dbx); }
+    64%  { left: 510px; top: 515px; color: var(--c-silver); background: var(--c-silver); transform: scale(1.1); }
+    74%  { left: 510px; top: 615px; color: var(--c-dbx);    background: var(--c-dbx); }
+    84%  { left: 510px; top: 705px; color: var(--c-gold);   background: var(--c-gold); transform: scale(1.3); }
+    93%  { left: 670px; top: 810px; color: var(--c-gold);   background: var(--c-gold); transform: scale(1.1); }
+    98%  { left: 822px; top: 810px; color: var(--c-serve);  background: var(--c-serve); transform: scale(1); opacity: 1; }
+    100% { left: 822px; top: 810px; transform: scale(2.2); opacity: 0; }
+  }
+
+  @keyframes flow-ingest-conso {
+    0%   { left: 255px; top:  55px; opacity: 0; transform: scale(0.4); color: var(--c-src);    background: var(--c-src); }
+    4%   { opacity: 1; transform: scale(1); }
+    13%  { left: 510px; top: 145px; color: var(--c-shir);   background: var(--c-shir); }
+    24%  { left: 510px; top: 225px; color: var(--c-adf);    background: var(--c-adf); transform: scale(1.15); }
+    34%  { left: 560px; top: 320px; color: var(--c-adf);    background: var(--c-adf); transform: scale(1.2); } /* PL_Bronze_Conso */
+    44%  { left: 510px; top: 380px; color: var(--c-bronze); background: var(--c-bronze); transform: scale(1.25); }
+    54%  { left: 510px; top: 435px; color: var(--c-dbx);    background: var(--c-dbx); }
+    64%  { left: 510px; top: 515px; color: var(--c-silver); background: var(--c-silver); transform: scale(1.1); }
+    74%  { left: 510px; top: 615px; color: var(--c-dbx);    background: var(--c-dbx); }
+    84%  { left: 510px; top: 705px; color: var(--c-gold);   background: var(--c-gold); transform: scale(1.3); }
+    93%  { left: 670px; top: 810px; color: var(--c-gold);   background: var(--c-gold); transform: scale(1.1); }
+    98%  { left: 822px; top: 810px; color: var(--c-serve);  background: var(--c-serve); transform: scale(1); opacity: 1; }
+    100% { left: 822px; top: 810px; transform: scale(2.2); opacity: 0; }
+  }
+
+  @keyframes flow-ingest-solar {
+    0%   { left: 415px; top:  55px; opacity: 0; transform: scale(0.4); color: var(--c-src);    background: var(--c-src); }
+    4%   { opacity: 1; transform: scale(1); }
+    13%  { left: 510px; top: 145px; color: var(--c-shir);   background: var(--c-shir); }
+    24%  { left: 510px; top: 225px; color: var(--c-adf);    background: var(--c-adf); transform: scale(1.15); }
+    34%  { left: 200px; top: 320px; color: var(--c-adf);    background: var(--c-adf); transform: scale(1.2); } /* PL_Bronze_Solar */
+    44%  { left: 510px; top: 380px; color: var(--c-bronze); background: var(--c-bronze); transform: scale(1.25); }
+    54%  { left: 510px; top: 435px; color: var(--c-dbx);    background: var(--c-dbx); }
+    64%  { left: 510px; top: 515px; color: var(--c-silver); background: var(--c-silver); transform: scale(1.1); }
+    74%  { left: 510px; top: 615px; color: var(--c-dbx);    background: var(--c-dbx); }
+    84%  { left: 510px; top: 705px; color: var(--c-gold);   background: var(--c-gold); transform: scale(1.3); }
+    93%  { left: 670px; top: 810px; color: var(--c-gold);   background: var(--c-gold); transform: scale(1.1); }
+    98%  { left: 822px; top: 810px; color: var(--c-serve);  background: var(--c-serve); transform: scale(1); opacity: 1; }
+    100% { left: 822px; top: 810px; transform: scale(2.2); opacity: 0; }
+  }
+
+  @keyframes flow-ingest-meteo {
+    0%   { left: 575px; top:  55px; opacity: 0; transform: scale(0.4); color: var(--c-src);    background: var(--c-src); }
+    4%   { opacity: 1; transform: scale(1); }
+    13%  { left: 510px; top: 145px; color: var(--c-shir);   background: var(--c-shir); }
+    24%  { left: 510px; top: 225px; color: var(--c-adf);    background: var(--c-adf); transform: scale(1.15); }
+    34%  { left: 740px; top: 320px; color: var(--c-adf);    background: var(--c-adf); transform: scale(1.2); } /* PL_Bronze_Meteo */
+    44%  { left: 510px; top: 380px; color: var(--c-bronze); background: var(--c-bronze); transform: scale(1.25); }
+    54%  { left: 510px; top: 435px; color: var(--c-dbx);    background: var(--c-dbx); }
+    64%  { left: 510px; top: 515px; color: var(--c-silver); background: var(--c-silver); transform: scale(1.1); }
+    74%  { left: 510px; top: 615px; color: var(--c-dbx);    background: var(--c-dbx); }
+    84%  { left: 510px; top: 705px; color: var(--c-gold);   background: var(--c-gold); transform: scale(1.3); }
+    93%  { left: 670px; top: 810px; color: var(--c-gold);   background: var(--c-gold); transform: scale(1.1); }
+    98%  { left: 822px; top: 810px; color: var(--c-serve);  background: var(--c-serve); transform: scale(1); opacity: 1; }
+    100% { left: 822px; top: 810px; transform: scale(2.2); opacity: 0; }
+  }
+
+  /* Legacy single-flow keyframe (unused, kept for backward-compat in case CSS is referenced elsewhere) */
+  @keyframes flow-ingest {
+    0%   { left:  90px; top:  60px; opacity: 0; }
+    100% { left: 822px; top: 810px; opacity: 0; }
+  }
+
+  /* When ingest hits Gold, a sibling packet forks off to Power BI.
+     This keyframe runs at half the parent duration for a snappy split feel. */
+  @keyframes flow-gold-fork-pbi {
+    0%   { left: 510px; top: 705px; opacity: 0; transform: scale(1); color: var(--c-gold);  background: var(--c-gold); }
+    8%   { opacity: 1; transform: scale(1.2); }
+    55%  { left: 380px; top: 705px; color: var(--c-gold);  background: var(--c-gold);  transform: scale(1.15); }
+    85%  { left: 300px; top: 810px; color: var(--c-serve); background: var(--c-serve); transform: scale(1); opacity: 1; }
+    100% { left: 300px; top: 810px; transform: scale(2.2); opacity: 0; }
+  }
+
+  .packet.kind-gold-fork-pbi {
+    animation: flow-gold-fork-pbi calc(var(--duration) * 0.5) cubic-bezier(0.4, 0, 0.6, 1) forwards;
+  }
+
+  /* Same idea for the ML flow — Gold → Power BI split-off (used after ml_load) */
+  @keyframes flow-gold-fork-pbi-ml {
+    0%   { left: 510px; top: 705px; opacity: 0; transform: scale(1); color: var(--c-gold);  background: var(--c-gold); }
+    8%   { opacity: 1; transform: scale(1.2); }
+    55%  { left: 380px; top: 705px; color: var(--c-gold);  background: var(--c-gold);  transform: scale(1.15); }
+    85%  { left: 300px; top: 810px; color: var(--c-serve); background: var(--c-serve); transform: scale(1); opacity: 1; }
+    100% { left: 300px; top: 810px; transform: scale(2.2); opacity: 0; }
+  }
+  @keyframes flow-ml {
+    0%   { left: 510px; top: 515px; opacity: 0; transform: scale(0.4); color: var(--c-silver); background: var(--c-silver); }
+    5%   { opacity: 1; transform: scale(1); }
+    18%  { left: 820px; top: 515px; color: var(--c-dbx); background: var(--c-dbx); }
+    36%  { left: 820px; top: 615px; color: var(--c-ml);  background: var(--c-ml); transform: scale(1.4); box-shadow: 0 0 20px 4px currentColor; }
+    52%  { left: 820px; top: 615px; color: var(--c-ml);  background: var(--c-ml); transform: scale(1.6); box-shadow: 0 0 28px 6px currentColor; }
+    68%  { left: 820px; top: 705px; color: var(--c-dbx); background: var(--c-dbx); transform: scale(1.2); }
+    82%  { left: 510px; top: 705px; color: var(--c-gold); background: var(--c-gold); transform: scale(1.3); }
+    95%  { left: 300px; top: 810px; color: var(--c-serve); background: var(--c-serve); transform: scale(1); opacity: 1; }
+    100% { left: 300px; top: 810px; transform: scale(2.2); opacity: 0; }
+  }
+
+  /* ============================================================
+     LEGEND + CONSOLE
+     ============================================================ */
+  .legend {
+    margin-top: 22px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+    gap: 16px;
+  }
+  .legend-card {
+    background: var(--bg-1);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 14px 18px;
+  }
+  .legend-card h3 {
+    margin: 0 0 10px;
+    font-size: 12px; font-weight: 600; letter-spacing: 0.12em;
+    text-transform: uppercase; color: var(--txt-1);
+    font-family: 'JetBrains Mono', monospace;
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  }
+  .legend-card h3 .badge {
+    font-size: 10px; padding: 2px 7px; border-radius: 3px;
+    background: var(--bg-2); color: currentColor; font-weight: 500;
+  }
+  .legend-card.ingest h3 { color: var(--c-adf); }
+  .legend-card.ml h3     { color: var(--c-ml); }
+  .legend-card ol {
+    margin: 0; padding: 0;
+    list-style: none; counter-reset: step;
+    font-size: 12px; color: var(--txt-1);
+    font-family: 'JetBrains Mono', monospace; line-height: 1.65;
+  }
+  .legend-card ol li { counter-increment: step; padding-left: 26px; position: relative; }
+  .legend-card ol li::before {
+    content: counter(step);
+    position: absolute; left: 0; top: 1px;
+    width: 18px; height: 18px; border-radius: 50%;
+    background: var(--bg-2); border: 1px solid currentColor; color: currentColor;
+    font-size: 10px; font-weight: 600;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .legend-card ol li b { color: var(--txt-0); font-weight: 500; }
+  .legend-card ol li code {
+    color: var(--c-gold);
+    background: rgba(255,160,0,0.08);
+    padding: 1px 5px; border-radius: 3px;
+    font-size: 11px;
+  }
+
+  .console {
+    margin-top: 16px;
+    background: #000;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 14px 18px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: #4ade80;
+    min-height: 70px;
+  }
+  .console .line { display: block; line-height: 1.6; }
+  .console .line .ts { color: var(--txt-2); margin-right: 10px; }
+  .console .line .tag { font-weight: 600; margin-right: 8px; }
+  .console .line .tag.t-ingest { color: var(--c-adf); }
+  .console .line .tag.t-ml     { color: #c084fc; }
+  .console .line .tag.t-ok     { color: #4ade80; }
+  .console .blink::after { content: "▋"; color: #4ade80; animation: blink 1s steps(2) infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- HEADER -->
+  <header>
+    <div>
+      <h1>Bellevue <b>Data Cycle</b> · Live Architecture</h1>
+      <div class="sub">Medallion Lakehouse · ADF · Databricks · Azure SQL · KNIME · SAC / Power BI</div>
+    </div>
+    <div class="meta">
+      <div><span>factory</span> <b>group3-df</b> · switzerlandnorth</div>
+      <div><span>storage</span> <b>adlsbellevuegrp3</b> (Gen2)</div>
+      <div><span>warehouse</span> <b>sqlserver-bellevue-grp3 / DevDB</b></div>
+    </div>
+  </header>
+
+  <!-- CONTROLS -->
+  <div class="controls">
+    <div class="group">
+      <button class="trigger" id="btn-ingest" onclick="trigger('ingest')">
+        <span class="dot"></span>
+        TRG_Daily_0715 · PL_Ingest_Bronze
+      </button>
+      <button class="trigger" id="btn-ml" onclick="trigger('ml')">
+        <span class="dot"></span>
+        TRG_Daily_0930 · PL_Upload_Pred_Gold
+      </button>
+    </div>
+    <div class="sep"></div>
+    <button class="trigger" id="btn-stop" onclick="stopAll()">RESET</button>
+    <div class="sep"></div>
+    <div class="speed">
+      <span>SLOW</span>
+      <input type="range" id="speed" min="3" max="10" step="0.5" value="6" oninput="updateSpeed()">
+      <span>FAST</span>
+      <span id="speed-readout" style="color:var(--c-gold); margin-left:6px;">6.0s</span>
+    </div>
+  </div>
+
+  <!-- STAGE -->
+  <div class="stage-wrap" id="stage-wrap">
+   <div class="stage" id="stage">
+
+    <!-- Lane labels -->
+    <div class="lane-labels">
+      <div class="lane l-src">    <span><b>ON-PREM</b></span><span>sources</span></div>
+      <div class="lane l-shir">   <span><b>GATEWAY</b></span><span>SHIR</span></div>
+      <div class="lane l-adf">    <span><b>ORCHESTRATION</b></span><span>ADF</span></div>
+      <div class="lane l-bronze"> <span><b>BRONZE</b></span><span>raw ADLS</span></div>
+      <div class="lane l-dbx">    <span><b>COMPUTE</b></span><span>Databricks</span></div>
+      <div class="lane l-silver"> <span><b>SILVER</b></span><span>Parquet ADLS</span></div>
+      <div class="lane l-gold">   <span><b>GOLD</b></span><span>Azure SQL · ML</span></div>
+      <div class="lane l-serve">  <span><b>SERVING</b></span><span>SAC · PBI</span></div>
+    </div>
+
+    <!-- Diagram canvas (1170 × 920) -->
+    <div class="diagram" id="diagram">
+
+      <!-- WIRES -->
+      <svg class="wires" viewBox="0 0 1170 920" preserveAspectRatio="none">
+        <!-- Sources → SHIR -->
+        <path d="M 90,90  L 90,125 L 510,125 L 510,135"/>
+        <path d="M 250,90 L 250,125 L 510,125"/>
+        <path d="M 410,90 L 410,125 L 510,125"/>
+        <path d="M 570,90 L 570,125 L 510,125"/>
+        <!-- SHIR → ADF -->
+        <path class="solid" d="M 510,170 L 510,210"/>
+        <!-- ADF → 4 sub-pipelines -->
+        <path d="M 510,250 L 510,275 L 200,275 L 200,295"/>
+        <path d="M 510,275 L 380,275 L 380,295"/>
+        <path d="M 510,275 L 510,295"/>
+        <path d="M 510,275 L 700,275 L 700,295"/>
+        <!-- 4 sub-pipelines → BRONZE -->
+        <path class="dotted" d="M 200,335 L 200,355 L 510,355 L 510,375"/>
+        <path class="dotted" d="M 380,335 L 380,355 L 510,355"/>
+        <path class="dotted" d="M 510,335 L 510,355"/>
+        <path class="dotted" d="M 700,335 L 700,355 L 510,355"/>
+        <!-- BRONZE → silver_transformation -->
+        <path class="solid" d="M 510,410 L 510,420"/>
+        <!-- silver_transformation → SILVER -->
+        <path class="solid" d="M 510,470 L 510,495"/>
+        <!-- SILVER → 2 Gold-build notebooks -->
+        <path class="solid" d="M 510,540 L 510,575 L 350,575 L 350,595"/>
+        <path class="solid" d="M 510,575 L 510,595"/>
+        <!-- 2 notebooks → GOLD -->
+        <path class="solid" d="M 350,635 L 350,660 L 510,660 L 510,685"/>
+        <path class="solid" d="M 510,635 L 510,685"/>
+        <!-- GOLD → SAC · File Share (routes around the ML column on the right) -->
+        <path class="solid" d="M 640,705 L 670,705 L 670,810 L 740,810"/>
+        <!-- GOLD → Power BI -->
+        <path class="solid" d="M 460,705 L 300,705 L 300,790"/>
+        <!-- ML edges (purple) — Silver → ml_export → KNIME → ml_load → Gold (no SAC link) -->
+        <path class="ml-edge" d="M 590,515 L 750,515"/>
+        <path class="ml-edge-solid" d="M 820,545 L 820,585"/>
+        <path class="ml-edge-solid" d="M 820,645 L 820,685"/>
+        <path class="ml-edge" d="M 750,705 L 590,705"/>
+      </svg>
+
+      <!-- ON-PREM SOURCES -->
+      <div class="node n-src store" id="n-src-booking" style="left: 30px;  top: 20px; width: 130px;">
+        <div class="title"><span class="ico">📁</span>SMB · Booking</div>
+        <div class="desc">TSV · room bookings</div>
+      </div>
+      <div class="node n-src store" id="n-src-conso" style="left: 190px; top: 20px; width: 130px;">
+        <div class="title"><span class="ico">📁</span>SMB · Conso</div>
+        <div class="desc">UTF-16 · energy/T°/RH</div>
+      </div>
+      <div class="node n-src store" id="n-src-solar" style="left: 350px; top: 20px; width: 130px;">
+        <div class="title"><span class="ico">📁</span>SMB · Solarlogs</div>
+        <div class="desc">5 inverters · CSV</div>
+      </div>
+      <div class="node n-src store" id="n-src-meteo" style="left: 510px; top: 20px; width: 130px;">
+        <div class="title"><span class="ico">🔐</span>SFTP · Meteo</div>
+        <div class="desc">historical + 3h forecast</div>
+      </div>
+
+      <!-- SHIR -->
+      <div class="node n-shir" id="n-shir" style="left: 400px; top: 130px; width: 220px;">
+        <div class="title"><span class="ico">🛡️</span>Self-Hosted Integration Runtime</div>
+        <div class="desc">Group3-VM-Runtime · 10.130.25.152</div>
+      </div>
+
+      <!-- ADF orchestrator -->
+      <div class="node n-adf" id="n-adf" style="left: 400px; top: 210px; width: 220px;">
+        <div class="title"><span class="ico">⚙️</span>PL_Ingest_Bronze · ADF</div>
+        <div class="desc">master orchestrator · group3-df</div>
+      </div>
+
+      <!-- 4 Bronze sub-pipelines -->
+      <div class="group-box" style="left: 100px; top: 290px; width: 720px; height: 50px;">
+        <span class="group-label">Bronze sub-pipelines · GetMetadata → Filter → ForEach Copy</span>
+      </div>
+      <div class="node n-adf" id="n-pl-solar" style="left: 130px; top: 300px; width: 140px;">
+        <div class="title">PL_Bronze_Solar</div>
+        <div class="desc">file-server copy</div>
+      </div>
+      <div class="node n-adf" id="n-pl-bookings" style="left: 310px; top: 300px; width: 140px;">
+        <div class="title">PL_Bronze_Bookings</div>
+        <div class="desc">SMB · TSV</div>
+      </div>
+      <div class="node n-adf" id="n-pl-conso" style="left: 490px; top: 300px; width: 140px;">
+        <div class="title">PL_Bronze_Conso</div>
+        <div class="desc">SMB · routed by name</div>
+      </div>
+      <div class="node n-adf" id="n-pl-meteo" style="left: 670px; top: 300px; width: 140px;">
+        <div class="title">PL_Bronze_Meteo</div>
+        <div class="desc">SFTP · historic</div>
+      </div>
+
+      <!-- BRONZE store -->
+      <div class="node n-bronze store" id="n-bronze" style="left: 380px; top: 360px; width: 260px;">
+        <div class="title"><span class="ico">🥉</span>BRONZE · ADLS Gen2</div>
+        <div class="desc">raw CSV (UTF-8 / UTF-16 LE)</div>
+      </div>
+
+      <!-- silver_transformation notebook -->
+      <div class="node n-dbx" id="n-silver-nb" style="left: 350px; top: 420px; width: 320px;">
+        <div class="title"><span class="ico">📓</span>silver_transformation.py</div>
+        <div class="desc">UTF-16 cleanup · solar unpivot · Sierre synth · GDPR SHA-256</div>
+      </div>
+
+      <!-- SILVER store -->
+      <div class="node n-silver store" id="n-silver" style="left: 380px; top: 495px; width: 260px;">
+        <div class="title"><span class="ico">🥈</span>SILVER · ADLS Parquet</div>
+        <div class="desc">cleaned · typed · deduplicated</div>
+      </div>
+
+      <!-- Gold-build (parallel notebooks) -->
+      <div class="group-box" style="left: 250px; top: 585px; width: 420px; height: 60px;">
+        <span class="group-label">Gold build (parallel)</span>
+      </div>
+      <div class="node n-dbx" id="n-dim" style="left: 265px; top: 600px; width: 165px;">
+        <div class="title"><span class="ico">📓</span>silver_gold_dimensions</div>
+        <div class="desc">8 dims · MERGE</div>
+      </div>
+      <div class="node n-dbx" id="n-fact" style="left: 445px; top: 600px; width: 210px;">
+        <div class="title"><span class="ico">📓</span>silver_gold_facts</div>
+        <div class="desc">7 facts · watermark · JDBC append</div>
+      </div>
+
+      <!-- GOLD store -->
+      <div class="node n-gold store" id="n-gold" style="left: 380px; top: 685px; width: 260px;">
+        <div class="title"><span class="ico">🥇</span>GOLD · Azure SQL DevDB</div>
+        <div class="desc">8 dims · 7 facts · 7 views</div>
+      </div>
+
+      <!-- ML BRANCH (right column) -->
+      <div class="node n-dbx" id="n-mlexp" style="left: 740px; top: 495px; width: 165px;">
+        <div class="title"><span class="ico">📓</span>ml_export_to_knime</div>
+        <div class="desc">3h→15min · room occ%</div>
+      </div>
+
+      <div class="node n-ml" id="n-knime" style="left: 740px; top: 595px; width: 165px;">
+        <div class="title"><span class="ico">☁️</span>KNIME Server</div>
+        <div class="desc">REST · GBT regressors</div>
+      </div>
+
+      <div class="node n-dbx" id="n-mlload" style="left: 740px; top: 685px; width: 165px;">
+        <div class="title"><span class="ico">📓</span>ml_load_predictions</div>
+        <div class="desc">DELETE→INSERT · backfill</div>
+      </div>
+
+      <!-- SERVING (bottom row) -->
+      <div class="node n-serve" id="n-pbi" style="left: 215px; top: 785px; width: 170px;">
+        <div class="title"><span class="ico">📊</span>Power BI</div>
+        <div class="desc">RLS-filtered views</div>
+      </div>
+
+      <div class="node n-serve" id="n-sac" style="left: 740px; top: 785px; width: 165px;">
+        <div class="title"><span class="ico">📤</span>SAC · File Share</div>
+        <div class="desc">PL_SAC_Export → SAP</div>
+      </div>
+
+      <!-- Cross-cutting (top right) -->
+      <div class="node n-sec" style="left: 970px; top: 20px; width: 165px;">
+        <div class="title"><span class="ico">🔑</span>Key Vault</div>
+        <div class="desc">DataCycleGroup3Keys</div>
+      </div>
+      <div class="node n-sec" style="left: 970px; top: 90px; width: 165px;">
+        <div class="title"><span class="ico">🪪</span>UAMI · OIDC</div>
+        <div class="desc">gh-datacycle-oidc</div>
+      </div>
+      <div class="node n-sec" style="left: 970px; top: 160px; width: 165px;">
+        <div class="title"><span class="ico">🛂</span>SQL RLS</div>
+        <div class="desc">Director / Technician</div>
+      </div>
+
+    </div><!-- /diagram -->
+   </div><!-- /stage -->
+  </div><!-- /stage-wrap -->
+
+  <!-- LEGEND -->
+  <div class="legend">
+    <div class="legend-card ingest">
+      <h3>TRG_Daily_0715 <span class="badge">PL_Ingest_Bronze</span></h3>
+      <ol>
+        <li>4 on-prem sources hit the <b>SHIR</b> (SMB + SFTP)</li>
+        <li>ADF fans out to 4 parallel <b>PL_Bronze_*</b> sub-pipelines</li>
+        <li>Raw CSVs land in <b>Bronze</b> ADLS Gen2</li>
+        <li><code>silver_transformation.py</code> writes Parquet to <b>Silver</b></li>
+        <li><code>silver_gold_dimensions</code> ‖ <code>silver_gold_facts</code> populate <b>Gold</b></li>
+        <li><code>sac_export_to_adls.py</code> + <b>PL_SAC_Export</b> push CSV to <b>SAC</b></li>
+      </ol>
+    </div>
+    <div class="legend-card ml">
+      <h3>TRG_Daily_0930 <span class="badge">PL_Upload_Pred_Gold</span></h3>
+      <ol>
+        <li><code>ml_export_to_knime.py</code> reads <b>Silver</b> Parquet</li>
+        <li>Feature CSVs land in <code>mldata/knime_input/</code></li>
+        <li><b>KNIME Server</b> runs Data_Prep + Solar/Conso predictors (REST)</li>
+        <li>Predictions land in <code>mldata/knime_output/</code></li>
+        <li><code>ml_load_predictions.py</code> upserts <code>fact_energy_prediction</code></li>
+        <li><code>sp_backfill_prediction_actuals</code> fills MAPE → <b>Power BI</b></li>
+      </ol>
+    </div>
+  </div>
+
+  <!-- CONSOLE -->
+  <div class="console" id="console">
+    <span class="line"><span class="ts">[boot]</span><span class="tag t-ok">SYSTEM</span>Architecture loaded · 2 daily triggers idle.</span>
+    <span class="line blink"><span class="ts">[idle]</span>Awaiting trigger fire <span></span></span>
+  </div>
+</div>
+
+<script>
+  /* ============================================================
+     RESPONSIVE SCALING
+     Stage authored at 1280×920.  Measure wrapper width and
+     scale stage so it always fits the viewport.
+     ============================================================ */
+  const STAGE_W = 1280;
+  const stageWrap = document.getElementById('stage-wrap');
+
+  function fitStage() {
+    const w = stageWrap.clientWidth;
+    const scale = Math.min(1, w / STAGE_W);
+    document.documentElement.style.setProperty('--scale', scale.toFixed(4));
+  }
+  window.addEventListener('resize', fitStage);
+  window.addEventListener('load', fitStage);
+  fitStage();
+
+  /* ============================================================
+     ANIMATION ENGINE
+     ============================================================ */
+  const diagram = document.getElementById('diagram');
+  const consoleEl = document.getElementById('console');
+  const speedRange = document.getElementById('speed');
+  const speedReadout = document.getElementById('speed-readout');
+
+  /* INGEST FLOW
+     Now: 4 distinct packets, one per on-prem source, each routed through
+     its own PL_Bronze_* sub-pipeline before merging into the central spine.
+     Each sub-flow shares the post-Bronze stages (Silver → Gold → SAC).         */
+  const SHARED_TAIL = [
+    [0.44, 'n-bronze'],
+    [0.54, 'n-silver-nb'],
+    [0.64, 'n-silver'],
+    [0.74, 'n-dim'],
+    [0.74, 'n-fact'],
+    [0.84, 'n-gold'],
+    [0.98, 'n-sac'],
+  ];
+
+  const INGEST_SOURCES = [
+    { kind: 'ingest-booking', src: 'n-src-booking', pipe: 'n-pl-bookings' },
+    { kind: 'ingest-conso',   src: 'n-src-conso',   pipe: 'n-pl-conso'   },
+    { kind: 'ingest-solar',   src: 'n-src-solar',   pipe: 'n-pl-solar'   },
+    { kind: 'ingest-meteo',   src: 'n-src-meteo',   pipe: 'n-pl-meteo'   },
+  ];
+
+  const FLOWS = {
+    ml: {
+      count: 4,
+      spawnGap: 460,
+      stages: [
+        [0.00, 'n-silver'],
+        [0.18, 'n-mlexp'],
+        [0.40, 'n-knime'],
+        [0.68, 'n-mlload'],
+        [0.82, 'n-gold'],
+        [0.95, 'n-pbi'],
+      ],
+    },
+  };
+
+  let activeTimers = [];
+  let activeFlow = null;
+
+  function updateSpeed() {
+    const v = parseFloat(speedRange.value);
+    document.documentElement.style.setProperty('--duration', v + 's');
+    speedReadout.textContent = v.toFixed(1) + 's';
+  }
+
+  function logLine(html) {
+    const div = document.createElement('span');
+    div.className = 'line';
+    div.innerHTML = html;
+    consoleEl.appendChild(div);
+    while (consoleEl.children.length > 6) consoleEl.firstChild.remove();
+    consoleEl.scrollTop = consoleEl.scrollHeight;
+  }
+
+  function ts() {
+    const d = new Date();
+    return `[${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}:${String(d.getSeconds()).padStart(2,'0')}]`;
+  }
+
+  function activateNode(id) {
+    const node = document.getElementById(id);
+    if (!node) return;
+    node.classList.add('active');
+    setTimeout(() => node.classList.remove('active'), 700);
+
+    // Pulse ring uses node's offsetLeft/Top — pre-scale pixels.
+    const cx = node.offsetLeft + node.offsetWidth  / 2;
+    const cy = node.offsetTop  + node.offsetHeight / 2;
+    const ring = document.createElement('div');
+    ring.className = 'pulse';
+    ring.style.left = cx + 'px';
+    ring.style.top  = cy + 'px';
+    ring.style.color = getComputedStyle(node).color;
+    diagram.appendChild(ring);
+    setTimeout(() => ring.remove(), 800);
+  }
+
+  function spawnPacket(kind) {
+    const p = document.createElement('div');
+    p.className = 'packet kind-' + kind;
+    diagram.appendChild(p);
+    p.addEventListener('animationend', () => p.remove());
+  }
+
+  /* Schedule one ingest sub-flow (one source → its sub-pipeline → shared tail).
+     At the Gold stage the data fans out: the original packet continues to
+     SAC File Share, AND a sibling packet forks off toward Power BI.            */
+  function runIngestSubflow(spec, durationMs) {
+    spawnPacket(spec.kind);
+    // Source lights up immediately (spawn moment)
+    activateNode(spec.src);
+    // Shared mid-stages, but with a SOURCE-SPECIFIC sub-pipeline
+    const stages = [
+      [0.13, 'n-shir'],
+      [0.24, 'n-adf'],
+      [0.34, spec.pipe],   // each source lights up ITS pipeline
+      ...SHARED_TAIL,
+    ];
+    stages.forEach(([frac, nodeId]) => {
+      const t = setTimeout(() => activateNode(nodeId), frac * durationMs);
+      activeTimers.push(t);
+    });
+
+    // ── FORK at Gold ─────────────────────────────────────────────────
+    // When the main packet hits Gold (84% of duration), spawn a sibling
+    // packet that travels Gold → Power BI. Light up Power BI ~85% into
+    // that fork's own duration (which is ~50% of parent).
+    const forkDelay = 0.84 * durationMs;
+    const tFork = setTimeout(() => {
+      spawnPacket('gold-fork-pbi');
+      // Fork keyframe runs at half the parent duration; PBI lights at ~85% of it
+      const tPbi = setTimeout(() => activateNode('n-pbi'),
+                              0.85 * (durationMs * 0.5));
+      activeTimers.push(tPbi);
+    }, forkDelay);
+    activeTimers.push(tFork);
+  }
+
+  function trigger(kind) {
+    if (activeFlow) return;
+    activeFlow = kind;
+    document.getElementById('btn-ingest').disabled = true;
+    document.getElementById('btn-ml').disabled = true;
+
+    const durationMs = parseFloat(getComputedStyle(document.documentElement)
+      .getPropertyValue('--duration')) * 1000;
+
+    if (kind === 'ingest') {
+      logLine(`<span class="ts">${ts()}</span><span class="tag t-ingest">[07:15]</span>PL_Ingest_Bronze fired · 4 source streams + 4 PL_Bronze_* + 3 notebooks + SAC export.`);
+
+      // Stagger the 4 source packets so they don't visually overlap
+      const STAGGER = 240; // ms between each source packet
+      INGEST_SOURCES.forEach((spec, i) => {
+        const t = setTimeout(() => runIngestSubflow(spec, durationMs), i * STAGGER);
+        activeTimers.push(t);
+      });
+
+      // Total run time: last packet spawn + full duration + fork-anim tail + buffer
+      // Fork spawns at 0.84 × duration relative to its parent, then runs
+      // for 0.5 × duration. Worst-case last packet finishes its fork at:
+      //   (3 × STAGGER) + 0.84·duration + 0.5·duration + buffer
+      const totalMs = (INGEST_SOURCES.length - 1) * STAGGER + 1.34 * durationMs + 200;
+      const tEnd = setTimeout(() => {
+        activeFlow = null;
+        document.getElementById('btn-ingest').disabled = false;
+        document.getElementById('btn-ml').disabled = false;
+        logLine(`<span class="ts">${ts()}</span><span class="tag t-ingest">[07:15]</span><span style="color:#4ade80">✓</span> Bronze→Silver→Gold complete · Power BI refreshed · SAC CSV synced.`);
+      }, totalMs);
+      activeTimers.push(tEnd);
+      return;
+    }
+
+    // ML flow (unchanged)
+    const flow = FLOWS.ml;
+    logLine(`<span class="ts">${ts()}</span><span class="tag t-ml">[09:30]</span>PL_Upload_Pred_Gold fired · KNIME REST cycle + fact_energy_prediction load.`);
+
+    for (let i = 0; i < flow.count; i++) {
+      const t = setTimeout(() => {
+        spawnPacket('ml');
+        flow.stages.forEach(([frac, nodeId]) => {
+          const t2 = setTimeout(() => activateNode(nodeId), frac * durationMs);
+          activeTimers.push(t2);
+        });
+      }, i * flow.spawnGap);
+      activeTimers.push(t);
+    }
+
+    const totalMs = (flow.count - 1) * flow.spawnGap + durationMs + 200;
+    const tEnd = setTimeout(() => {
+      activeFlow = null;
+      document.getElementById('btn-ingest').disabled = false;
+      document.getElementById('btn-ml').disabled = false;
+      logLine(`<span class="ts">${ts()}</span><span class="tag t-ml">[09:30]</span><span style="color:#4ade80">✓</span> fact_energy_prediction updated · vw_prediction_accuracy refreshed.`);
+    }, totalMs);
+    activeTimers.push(tEnd);
+  }
+
+  function stopAll() {
+    activeTimers.forEach(clearTimeout);
+    activeTimers = [];
+    document.querySelectorAll('.packet, .pulse').forEach(el => el.remove());
+    document.querySelectorAll('.node.active').forEach(el => el.classList.remove('active'));
+    activeFlow = null;
+    document.getElementById('btn-ingest').disabled = false;
+    document.getElementById('btn-ml').disabled = false;
+    logLine(`<span class="ts">${ts()}</span><span class="tag t-ok">RESET</span>State cleared · ready.`);
+  }
+
+  updateSpeed();
+</script>
+</body>
+</html>
