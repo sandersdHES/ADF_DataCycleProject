@@ -22,28 +22,7 @@ A daily data cycle that ingests building-energy, solar-production, meteorologica
 
 ## 2. Architecture
 
-```
- On-prem Windows VM (10.130.25.152)
- ├── SMB shares: BellevueBooking, BellevueConso, Solarlogs
- └── SFTP: meteo + future forecasts
-          │
-          │  Self-Hosted IR
-          ▼
- Azure Data Factory (group3-df)
-   ├── PL_Ingest_Bronze (07:15 trigger)        → bronze/
-   ├── Silver/Gold notebooks                    → silver/, SQL DevDB
-   ├── ml_export_to_knime                       → mldata/knime_input/
-   ├── PL_Upload_Pred_Gold (09:30 trigger) ──▶ KNIME Server (REST)
-   │                                            │
-   │                                            ▼
-   │                                          mldata/knime_output/
-   │                                            │
-   │   ml_load_predictions ◀────────────────────┘
-   │         └─▶ SQL: fact_energy_prediction + sp_backfill_prediction_actuals
-   │
-   └── PL_SAC_Export
-           └─▶ sacexport/ → Azure File Share → SAC consumption
-```
+Link to the Architecture page [here](./ARCHITECTURE.md)
 
 Every arrow runs under orchestration — there is no direct producer-to-consumer handoff outside ADF.
 
