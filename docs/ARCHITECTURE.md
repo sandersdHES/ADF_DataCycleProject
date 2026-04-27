@@ -5,8 +5,6 @@ On-premises sources are ingested daily into an Azure Medallion Lakehouse,
 transformed by Databricks, scored by a KNIME ML server, and served to SAP
 Analytics Cloud and Power BI.
 
-Live Flow available [here](https://claude.ai/public/artifacts/183e311a-edae-4062-9f37-8db0a9e754ac)
-
 ---
 
 ## 1. End-to-End Data Flow
