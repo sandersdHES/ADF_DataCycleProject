@@ -1,7 +1,5 @@
 # ADF DataCycle Project – Corrected Agile Backlog
 
-_Generated on 2026-04-24 from Agile_ProjectPlan_Group3.xlsx with corrections applied._
-
 ## Anomaly Corrections Applied
 
 - US03–US13: Due dates corrected from 27/02/2026 (Sprint 1 end) to their actual sprint end dates
