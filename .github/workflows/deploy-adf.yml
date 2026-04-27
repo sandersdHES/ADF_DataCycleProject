@@ -31,7 +31,7 @@ jobs:
     runs-on: ubuntu-latest
     environment: prod
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       # enable-AzPSSession is required because data-factory-deploy-action uses
       # Az PowerShell cmdlets (Get-AzDataFactoryV2Trigger, etc.), which need
