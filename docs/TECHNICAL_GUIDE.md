@@ -44,6 +44,12 @@ Every arrow runs under orchestration — there is no direct producer-to-consumer
 │
 ├── databricks/notebooks/             # 6 notebooks imported via Databricks Repos
 │
+├── knime/                            # KNIME workflow source files (.knwf)
+│   ├── Data_Preparation.knwf         # Loads feature CSVs, prepares data for inference
+│   ├── Model_Selection.knwf          # Re-evaluates active model version (Mondays only)
+│   ├── REST_Interface_Solar.knwf     # Solar production predictor — GBT (PV_PROD_V1)
+│   └── REST_Interface_Cons.knwf      # Consumption predictor — GBT (CONS_V1)
+│
 ├── config/                           # Lives in ADLS /config/ at runtime
 │   ├── ml_models_config.json
 │   └── electricity_tariff_config.json
@@ -131,12 +137,14 @@ All four `PL_Bronze_*` pipelines share an incremental-copy pattern:
 
 ### 5.3 Run_Knime — KNIME REST deployments
 
-| Step | KNIME deployment ID | Cadence |
-|---|---|---|
-| `Data_Preparation` | `rest:e481f0fd-89ba-409a-aaa2-d8a648956949` | Every run |
-| `Model_Selection` | `rest:509f9c76-1fd3-444d-80a6-4df7848b1621` | **Mondays only** (conditional via `TriggerTime.DayOfWeek`) |
-| `Consumption predictor` | `rest:348633fa-f10f-4a27-99de-11e1707190cb` | Every run (parallel) |
-| `Solar predictor` | `rest:eb96aa91-239b-4cf2-8c7e-a8a40516d4f3` | Every run (parallel) |
+`Run_Knime` calls four KNIME Server REST endpoints. The source `.knwf` workflow files for each deployment live in [`knime/`](knime/):
+
+| Step | KNIME deployment ID | Cadence | Source workflow |
+|---|---|---|---|
+| `Data_Preparation` | `rest:e481f0fd-89ba-409a-aaa2-d8a648956949` | Every run | `knime/Data_Preparation.knwf` |
+| `Model_Selection` | `rest:509f9c76-1fd3-444d-80a6-4df7848b1621` | **Mondays only** (conditional via `TriggerTime.DayOfWeek`) | `knime/Model_Selection.knwf` |
+| `Consumption predictor` | `rest:348633fa-f10f-4a27-99de-11e1707190cb` | Every run (parallel) | `knime/REST_Interface_Cons.knwf` |
+| `Solar predictor` | `rest:eb96aa91-239b-4cf2-8c7e-a8a40516d4f3` | Every run (parallel) | `knime/REST_Interface_Solar.knwf` |
 
 KNIME authenticates as user `N8XZA3zjIJVLk-P2XxLKBkLv1_aT-bX302wwgIGOmrY` using `knime` / `knimeappid` / `knimeappsecret` pulled from Key Vault.
 
@@ -284,11 +292,13 @@ Populating `ref_user_division_access` is a manual step — insert one row per Di
 
 ## 8. ML lifecycle (KNIME integration)
 
+**Workflow source files:** the four `.knwf` workflows that back the KNIME REST deployments are version-controlled in [`knime/`](knime/). This allows the KNIME Server to be fully rebuilt from the repo if needed — deploy each `.knwf` to the server via KNIME Analytics Platform and re-register it as a REST endpoint with the deployment IDs in §5.3.
+
 1. **Training** is manual and lives inside KNIME Analytics Platform — the two GBT regressors (100 trees, `lr=0.1`, `max_depth=5`) are currently trained on 2023-02-20 → 2023-04-19 data.
 2. Daily at **09:30**, `PL_Upload_Pred_Gold` fires:
-   - `Data_Preparation` deployment runs unconditionally.
-   - On Mondays only, `Model_Selection` re-evaluates the active model (via `@pipeline().TriggerTime.DayOfWeek`).
-   - Consumption + solar predictors run in parallel.
+   - `Data_Preparation` (`knime/Data_Preparation.knwf`) runs unconditionally.
+   - On Mondays only, `Model_Selection` (`knime/Model_Selection.knwf`) re-evaluates the active model (via `@pipeline().TriggerTime.DayOfWeek`).
+   - Consumption (`knime/REST_Interface_Cons.knwf`) + Solar (`knime/REST_Interface_Solar.knwf`) predictors run in parallel.
 3. KNIME writes CSVs to `mldata/knime_output/`.
 4. `ml_load_predictions.py` ingests them and updates `fact_energy_prediction`.
 5. `sp_backfill_prediction_actuals` joins yesterday's actuals onto earlier predictions, enabling `vw_prediction_accuracy` to track MAPE over time.

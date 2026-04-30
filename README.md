@@ -39,7 +39,7 @@ Two daily triggers drive the cycle:
 | Compute | Azure Databricks — 6 PySpark notebooks |
 | Storage | ADLS Gen2 (`bronze`, `silver`, `mldata`, `sacexport`, `config`) |
 | Serving | Azure SQL serverless Gen5 — `DevDB` |
-| ML | KNIME Server — GBT regressors (solar + consumption) |
+| ML | KNIME Server — GBT regressors (solar + consumption) — workflow source in `knime/` |
 | On-prem connectivity | Self-Hosted Integration Runtime on Windows VM |
 | Secrets | Azure Key Vault (`DataCycleGroup3Keys`) |
 | CI/CD | GitHub Actions — ADF validate + deploy (OIDC / UAMI) |
@@ -66,9 +66,15 @@ ADF_DataCycleProject/
 │       ├── silver_transformation.py        # Bronze → Silver (UTF-16, unpivot, GDPR)
 │       ├── silver_gold_dimensions.py       # Silver → Gold dimension MERGE
 │       ├── silver_gold_facts.py            # Silver → Gold facts (incremental watermark)
-│       ├── ml_export_to_knime.py           # Feature engineering → KNIME CSV
+│       ├── ml_export_to_knime.py           # Feature engineering → KNIME input CSVs
 │       ├── ml_load_predictions.py          # KNIME output → fact_energy_prediction
 │       └── sac_export_to_adls.py           # Gold views → SAC flat CSV
+│
+├── knime/                            # KNIME workflow source files (.knwf)
+│   ├── Data_Preparation.knwf               # Loads feature CSVs, prepares data for inference
+│   ├── Model_Selection.knwf                # Re-evaluates active model version (Mondays only)
+│   ├── REST_Interface_Solar.knwf           # Solar production predictor — GBT (PV_PROD_V1)
+│   └── REST_Interface_Cons.knwf            # Consumption predictor — GBT (CONS_V1)
 │
 ├── config/                           # Runtime config files (also in ADLS /config/)
 │   ├── ml_models_config.json

@@ -113,10 +113,11 @@ Home
 
 ### ML Lifecycle (KNIME Integration)
 **Purpose:** Explain the daily ML prediction cycle end-to-end.  
-**Source:** `docs/TECHNICAL_GUIDE.md` §8; `config/ml_models_config.json`  
+**Source:** `docs/TECHNICAL_GUIDE.md` §8; `config/ml_models_config.json`; `knime/`  
 **Content:**
 - Flow diagram: `ml_export_to_knime` → KNIME Server → `ml_load_predictions`
 - Two model descriptions (GBT solar, GBT consumption) with training period
+- `knime/` workflow source file inventory — mapping each `.knwf` to its REST deployment ID
 - KNIME deployment IDs and REST auth pattern
 - Monday-only Model_Selection logic
 - `sp_backfill_prediction_actuals` — how MAPE tracking works over time
