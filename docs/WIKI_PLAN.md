@@ -21,6 +21,8 @@ Home
 ├── Secrets & Configuration
 ├── Operational Runbook
 ├── Infrastructure & IaC
+├── User Handbook — Dashboard
+├── Data Privacy & GDPR
 └── Known Limitations & Roadmap
 ```
 
@@ -169,6 +171,33 @@ Home
 - How to activate the full IaC path (4 steps)
 - Link to [`infrastructure/DEPLOY.md`](../infrastructure/DEPLOY.md) for the full runbook
 - ADF Git configuration caveat (must be set manually in ADF Studio)
+
+---
+
+### User Handbook — Dashboard
+**Purpose:** End-user guide for navigating and interpreting the Solar Inverter Operations & Performance Dashboard.  
+**Source:** `docs/USER_HANDBOOK_DASHBOARD.md`  
+**Content:**
+- Data Controls & Navigation (Time Frame Selector, Inverter Unit Selector)
+- Production & Environmental Correlation chart explanation
+- Historical Production Rankings (Top Days)
+- Operational Log & Incident Tracking — status codes and red alert entries
+- Efficiency KPI Traffic Light system (thresholds and meaning)
+- Quick Diagnostic Procedure (3-step checklist)
+
+---
+
+### Data Privacy & GDPR
+**Purpose:** Legal and ethical framework for data processing in this project.  
+**Source:** `docs/DATA_PRIVACY_GDPR.md`  
+**Content:**
+- Legal basis for processing (GDPR Articles 6(1)(e), 89, 6(1)(a))
+- Privacy by Design principles (minimization, purpose limitation, accuracy)
+- Anonymization and pseudonymization protocols (PII removal, abstract identifiers)
+- Data security measures (secure storage, MFA access control, system integrity)
+- Data subject rights (access, rectification, erasure)
+- Data retention and disposal policy
+- Declaration of non-commerciality
 
 ---
 
