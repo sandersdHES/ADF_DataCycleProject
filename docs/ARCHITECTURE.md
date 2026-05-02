@@ -5,6 +5,8 @@ On-premises sources are ingested daily into an Azure Medallion Lakehouse,
 transformed by Databricks, scored by a KNIME ML server, and served to SAP
 Analytics Cloud and Power BI.
 
+> **Interactive diagram** — [View live architecture](https://sandersdHES.github.io/ADF_DataCycleProject/bellevue_architecture.html) *(requires GitHub Pages to be enabled — see setup below)*
+
 ---
 
 ## 1. End-to-End Data Flow

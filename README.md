@@ -81,28 +81,35 @@ ADF_DataCycleProject/
 │   └── electricity_tariff_config.json
 │
 ├── sql/
-│   └── deploy_schema.sql             # Idempotent DDL — dims, facts, views, stored procs
+│   ├── deploy_schema.sql             # Idempotent DDL — dims, facts, views, stored procs
+│   ├── deploy_security.sql           # Roles, RLS policies, schema permissions
+│   └── provision_user.sql            # Per-user login + role assignment template
 │
 ├── dashboards/
-│   └── PowerBy_RoomOccupacy.pbit     # Power BI template — room occupancy
+│   ├── Dashboard-Solar Production.pbix   # Power BI report — solar inverter production
+│   ├── Energy & Financial Overview.pbit  # Power BI template — energy & cost overview
+│   └── PowerBy_RoomOccupacy.pbit         # Power BI template — room occupancy
 │
 ├── infrastructure/                   # IaC (Bicep) — wired separately, see docs
 │   ├── main.bicep
 │   ├── modules/                      # 8 Bicep modules
 │   ├── parameters/dev.parameters.json
 │   ├── exported/                     # Frozen ARM + Bicep snapshots of current env
-│   ├── future/workflows/             # deploy-dev.yml / destroy-dev.yml (unwired)
+│   ├── future/workflows/             # deploy-dev.yml / deploy-sql.yml / destroy-dev.yml (unwired)
 │   └── DEPLOY.md                     # Full-rebuild runbook
 │
 ├── scripts/
 │   └── deploy_databricks.sh          # Idempotent Databricks provisioning
 │
 ├── docs/
+│   ├── ARCHITECTURE.md               # Mermaid end-to-end architecture diagrams
 │   ├── TECHNICAL_GUIDE.md            # Full architecture & operational reference
 │   ├── USER_HANDBOOK_DASHBOARD.md    # End-user guide for the Solar Inverter dashboard
 │   ├── USER_HANDBOOK_ROOM_OCCUPANCY.md # End-user guide for the Room Occupancy dashboard
 │   ├── USER_HANDBOOK_SAC_DASHBOARD.md  # End-user guide for the SAC Solar Panel dashboard
 │   ├── DATA_PRIVACY_GDPR.md          # GDPR compliance statement
+│   ├── WIKI_PLAN.md                  # Planned GitHub Wiki structure & source mapping
+│   ├── assets/                       # Screenshots used by the user handbooks
 │   └── TODO.md
 │
 └── .github/
@@ -116,6 +123,7 @@ ADF_DataCycleProject/
 
 ## Documentation
 
+- [Architecture](docs/ARCHITECTURE.md) — Mermaid diagrams: end-to-end data flow, daily orchestration timeline, and layer reference.
 - [Technical Guide](docs/TECHNICAL_GUIDE.md) — deep-dive on every component: pipelines, notebooks, SQL schema, ML lifecycle, CI/CD, secrets, IaC, and operational runbook.
 - [User Handbook — Solar Inverter Dashboard](docs/USER_HANDBOOK_DASHBOARD.md) — how to navigate and interpret the Solar Inverter Operations & Performance Dashboard.
 - [User Handbook — Room Occupancy Dashboard](docs/USER_HANDBOOK_ROOM_OCCUPANCY.md) — how to navigate and interpret the Room Occupancy & Utilization Dashboard.
