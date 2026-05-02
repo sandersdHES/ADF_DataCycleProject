@@ -21,7 +21,8 @@ Home
 ├── Secrets & Configuration
 ├── Operational Runbook
 ├── Infrastructure & IaC
-├── User Handbook — Dashboard
+├── User Handbook — Solar Inverter Dashboard
+├── User Handbook — Room Occupancy Dashboard
 ├── Data Privacy & GDPR
 └── Known Limitations & Roadmap
 ```
@@ -174,7 +175,7 @@ Home
 
 ---
 
-### User Handbook — Dashboard
+### User Handbook — Solar Inverter Dashboard
 **Purpose:** End-user guide for navigating and interpreting the Solar Inverter Operations & Performance Dashboard.  
 **Source:** `docs/USER_HANDBOOK_DASHBOARD.md`  
 **Content:**
@@ -184,6 +185,22 @@ Home
 - Operational Log & Incident Tracking — status codes and red alert entries
 - Efficiency KPI Traffic Light system (thresholds and meaning)
 - Quick Diagnostic Procedure (3-step checklist)
+
+---
+
+### User Handbook — Room Occupancy Dashboard
+**Purpose:** End-user guide for navigating and interpreting the Room Occupancy & Utilization Dashboard.  
+**Source:** `docs/USER_HANDBOOK_ROOM_OCCUPANCY.md`  
+**Assets:** `docs/assets/room-occupancy/` (8 dashboard screenshots)  
+**Content:**
+- Top Filters panel (WeekOfYear, SchoolName, DayName drop-downs)
+- KPI summary cards (Occupation Rate Pct, Peak Day Occupation, Total Bookings)
+- Room Occupancy by Hour heatmap matrix (colour-coded by red intensity)
+- Occupancy by Day of the Week bar chart (interactive cross-filtering)
+- Occupancy Over Time by Division line chart with trendline
+- Occupancy by Week of the Year area chart (IsAcademicDay legend)
+- Top Rooms by Occupancy leaderboard (interactive room filter)
+- Quick Reference table of interactive tips
 
 ---
 
