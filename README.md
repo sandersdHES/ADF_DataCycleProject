@@ -101,6 +101,7 @@ ADF_DataCycleProject/
 │   ├── TECHNICAL_GUIDE.md            # Full architecture & operational reference
 │   ├── USER_HANDBOOK_DASHBOARD.md    # End-user guide for the Solar Inverter dashboard
 │   ├── USER_HANDBOOK_ROOM_OCCUPANCY.md # End-user guide for the Room Occupancy dashboard
+│   ├── USER_HANDBOOK_SAC_DASHBOARD.md  # End-user guide for the SAC Solar Panel dashboard
 │   ├── DATA_PRIVACY_GDPR.md          # GDPR compliance statement
 │   └── TODO.md
 │
@@ -118,6 +119,7 @@ ADF_DataCycleProject/
 - [Technical Guide](docs/TECHNICAL_GUIDE.md) — deep-dive on every component: pipelines, notebooks, SQL schema, ML lifecycle, CI/CD, secrets, IaC, and operational runbook.
 - [User Handbook — Solar Inverter Dashboard](docs/USER_HANDBOOK_DASHBOARD.md) — how to navigate and interpret the Solar Inverter Operations & Performance Dashboard.
 - [User Handbook — Room Occupancy Dashboard](docs/USER_HANDBOOK_ROOM_OCCUPANCY.md) — how to navigate and interpret the Room Occupancy & Utilization Dashboard.
+- [User Handbook — SAC Dashboard](docs/USER_HANDBOOK_SAC_DASHBOARD.md) — how to navigate the SAP Analytics Cloud Solar Panel Overview dashboard, including daily refresh procedure.
 - [Data Privacy & GDPR Statement](docs/DATA_PRIVACY_GDPR.md) — data protection policies, anonymization protocols, and legal basis for processing.
 - [Infrastructure Deploy Runbook](infrastructure/DEPLOY.md) — full from-scratch rebuild procedure (Bicep + OIDC + bacpac + SHIR).
 - [Wiki](https://github.com/sandersdHES/ADF_DataCycleProject/wiki) — browsable reference pages: architecture, data sources, pipeline catalog, notebook reference, DWH schema, ML lifecycle, CI/CD, operational runbook, and more.

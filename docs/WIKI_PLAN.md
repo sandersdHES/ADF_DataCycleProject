@@ -24,6 +24,7 @@ Home
 ├── Infrastructure & IaC
 ├── User Handbook — Solar Inverter Dashboard
 ├── User Handbook — Room Occupancy Dashboard
+├── User Handbook — SAC Dashboard
 ├── Data Privacy & GDPR
 └── Known Limitations & Roadmap
 ```
@@ -222,6 +223,21 @@ Home
 - Occupancy by Week of the Year area chart (IsAcademicDay legend)
 - Top Rooms by Occupancy leaderboard (interactive room filter)
 - Quick Reference table of interactive tips
+
+---
+
+### User Handbook — SAC Dashboard
+**Purpose:** End-user guide for the SAP Analytics Cloud Solar Panel Overview dashboard, covering both monitoring use and the daily manual refresh procedure.  
+**Source:** `docs/USER_HANDBOOK_SAC_DASHBOARD.md`  
+**Content:**
+- Dashboard purpose and target audiences (technicians vs directors)
+- Access instructions (SAC login, Stories navigation)
+- Filter reference table (Date Range, Inverter Name, Status Category)
+- Four KPI cards explained (Failings, Failure Rate, Performance Ratio, Days with Failures)
+- Four chart descriptions (errors over time, errors per inverter, status distribution, performance ratio)
+- Technician guidance: daily check routine, fault investigation procedure, priority maintenance flags
+- Data refresh workflow (automated schedule + 3-step manual import via Azure Storage Explorer → SAC model)
+- Glossary of technical terms
 
 ---
 
