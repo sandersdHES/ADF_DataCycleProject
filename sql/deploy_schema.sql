@@ -312,7 +312,7 @@ BEGIN
     Periodicity       NVARCHAR(64)  NULL,
     RecurrenceStart   DATE          NULL,
     RecurrenceEnd     DATE          NULL,
-    Remarque          NVARCHAR(MAX) NULL,
+    Remark            NVARCHAR(MAX) NULL,
     IsRecurring AS CAST(CASE WHEN RecurrenceStart IS NOT NULL OR RecurrenceEnd IS NOT NULL THEN 1 ELSE 0 END AS BIT) PERSISTED,
     CONSTRAINT FK_fact_room_booking_date  FOREIGN KEY (DateKey)      REFERENCES dbo.dim_date(DateKey),
     CONSTRAINT FK_fact_room_booking_start FOREIGN KEY (StartTimeKey) REFERENCES dbo.dim_time(TimeKey),
@@ -569,4 +569,18 @@ FROM dbo.fact_energy_prediction p
 JOIN dbo.dim_date             d ON d.DateKey  = p.DateKey
 JOIN dbo.dim_prediction_model m ON m.ModelKey = p.ModelKey
 GROUP BY d.FullDate, m.ModelCode, m.ModelName, p.PredictionRunDateKey;
+GO
+
+----------------------------------------------------------------------
+-- One-time column migrations (idempotent)
+-- For databases created before column renames; no-op on fresh deploys.
+----------------------------------------------------------------------
+
+IF EXISTS (SELECT 1 FROM sys.columns
+           WHERE object_id = OBJECT_ID('dbo.fact_room_booking') AND name = 'Remarque')
+   AND NOT EXISTS (SELECT 1 FROM sys.columns
+           WHERE object_id = OBJECT_ID('dbo.fact_room_booking') AND name = 'Remark')
+BEGIN
+  EXEC sp_rename 'dbo.fact_room_booking.Remarque', 'Remark', 'COLUMN';
+END
 GO

@@ -62,6 +62,35 @@ This visual helps maintenance teams prioritize tasks at a glance.
 
 ---
 
+## Connecting Power BI with your own login
+
+Each user has a personal SQL login (e.g. `teacher.jdupont`, `director.alopez`). The dashboards are the same for everyone — what you see is filtered automatically by your role and division.
+
+1. Open the desired report (`.pbix`) or template (`.pbit`) from `dashboards/`.
+2. In Power BI Desktop, go to **Home → Transform data → Data source settings**.
+3. Select the `sqlserver-bellevue-grp3.database.windows.net / DevDB` source and click **Edit Permissions → Edit…**
+4. Switch the credential type to **Database** and enter your personal login + password.
+5. Click **OK**, close, and **Refresh** the report.
+
+Notes:
+- **Teachers** see room bookings only for divisions they are assigned to.
+- **Directors** see room bookings only for divisions they are assigned to.
+- **Technicians** see no room bookings (GDPR), but full solar/weather/prediction data.
+
+If a visual shows "permission denied" or unexpectedly empty data, verify with your administrator that your login is mapped to the correct division (table `ref_user_division_access`).
+
+### Demo accounts (one per role)
+
+The following accounts exist for demonstrations. **Initial passwords are not stored in this document** — they live in Azure Key Vault `DataCycleGroup3Keys` (same vault as `Admin-SQL-Password`). Ask your administrator, or retrieve them yourself with `az keyvault secret show` if you have access. Rotate after first use.
+
+| Username | Role | Division | Key Vault secret name |
+|---|---|---|---|
+| `teacher.demo` | `Teacher_Role` | 1 (default — adjust if needed) | `Teacher-Demo-Password` |
+| `director.demo` | `Director_Role` | 1 (default — adjust if needed) | `Director-Demo-Password` |
+| `technician.demo` | `Technician_Role` | n/a (bypasses RLS) | `Technician-Demo-Password` |
+
+---
+
 ## Quick Diagnostic Procedure
 
 Use this checklist when investigating a suspected fault:

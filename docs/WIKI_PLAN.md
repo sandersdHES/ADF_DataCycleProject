@@ -16,6 +16,7 @@ Home
 │   └── Linked Services
 ├── Databricks Notebooks
 ├── Data Warehouse Schema
+├── Security & User Management
 ├── ML Lifecycle (KNIME Integration)
 ├── CI/CD
 ├── Secrets & Configuration
@@ -111,6 +112,25 @@ Home
 - Computed columns (`RetailValue_CHF`, `CostCHF`, `IsRecurring`)
 - Three analytical views (`vw_inverter_status_breakdown`, `vw_inverter_performance`, `vw_prediction_accuracy`)
 - Tariff triplification note (SQL vs JSON vs SCD2)
+- Naming convention: all columns are English (e.g. `fact_room_booking.Remark`); the French Silver layer is mapped to English at the Gold boundary
+
+> Security objects (roles, RLS, user provisioning) live on the **Security & User Management** page.
+
+---
+
+### Security & User Management
+**Purpose:** How multi-user access is implemented in Azure SQL without Active Directory, and how to add a new person.  
+**Source:** `docs/TECHNICAL_GUIDE.md` §7.1, §7.2; `sql/deploy_security.sql`; `sql/provision_user.sql`  
+**Content:**
+- Why no AD: this is a lab environment; identity is modeled entirely with SQL **contained users** + database **roles** + **Row-Level Security**
+- Role catalog (table):
+  - `Director_Role` — energy + bookings + management KPIs (RLS by division)
+  - `Teacher_Role` — reference data, energy/sustainability facts, bookings (RLS by division), dashboard views; excludes weather forecasts, prediction tables, and inverter detail views
+  - `Technician_Role` — solar / weather / prediction; **no bookings** (GDPR); bypasses RLS
+- RLS mechanism: `fn_division_security` checks `ref_user_division_access` against `USER_NAME()`; security policy `BookingDivisionFilter` filters `fact_room_booking`
+- Provisioning a new user with `sql/provision_user.sql` — sqlcmd variables, idempotent re-runs, example invocation for each role
+- Operational tasks: rotate password (`ALTER USER … WITH PASSWORD`), revoke access (`DROP USER` + delete `ref_user_division_access` row(s))
+- How Power BI Desktop connects per user (Database authentication, edit Data source settings) — link to User Handbook page
 
 ---
 
@@ -185,6 +205,7 @@ Home
 - Operational Log & Incident Tracking — status codes and red alert entries
 - Efficiency KPI Traffic Light system (thresholds and meaning)
 - Quick Diagnostic Procedure (3-step checklist)
+- **Connecting Power BI with your own login** — step-by-step for changing the data source credentials in Power BI Desktop, plus what each role (Teacher / Director / Technician) sees; cross-link to the Security & User Management page
 
 ---
 

@@ -278,15 +278,35 @@ The tariff of `0.15 CHF/kWh` is hard-coded in the computed columns **and** in `c
 | Object | Type | Purpose |
 |---|---|---|
 | `Director_Role` | DB role | Broad read access: energy, room bookings, management KPIs |
+| `Teacher_Role` | DB role | Read access to reference data, energy/sustainability facts, room bookings (RLS-filtered to division), and dashboard views. Excludes weather forecasts, prediction tables, and inverter detail views |
 | `Technician_Role` | DB role | Technical read access: solar, prediction, weather data. **No access to room bookings** (GDPR) |
 | `dev.admin.sql` | SQL contained user | Member of `Technician_Role`. Password from Key Vault `Admin-SQL-Password` — never in git |
-| `ref_user_division_access` | Table | Maps Director-level login names to allowed `DivisionKey` values for RLS |
-| `fn_division_security` | Inline TVF | RLS predicate: `db_owner` + `Technician_Role` see all rows; Directors see only their mapped divisions |
+| `ref_user_division_access` | Table | Maps Director- and Teacher-level login names to allowed `DivisionKey` values for RLS |
+| `fn_division_security` | Inline TVF | RLS predicate: `db_owner` + `Technician_Role` see all rows; Directors and Teachers see only their mapped divisions |
 | `BookingDivisionFilter` | Security policy | Applies `fn_division_security` as a FILTER predicate on `fact_room_booking` |
 
-The RLS policy means a Director connecting as their login can only read `fact_room_booking` rows for divisions they are listed in `ref_user_division_access`. `db_owner` and `Technician_Role` bypass this filter.
+The RLS policy means a Director or Teacher connecting as their login can only read `fact_room_booking` rows for divisions they are listed in `ref_user_division_access`. `db_owner` and `Technician_Role` bypass this filter.
 
-Populating `ref_user_division_access` is a manual step — insert one row per Director login + `DivisionKey` they should access.
+Populating `ref_user_division_access` is automated by the provisioning script below — see §7.2.
+
+### 7.2 Provisioning a new user (`sql/provision_user.sql`)
+
+Active Directory is not used; multi-user access is implemented entirely via SQL contained users + database roles + RLS. Each person gets their own SQL login and connects PowerBI Desktop with that login (Database authentication). RLS at the database layer narrows results based on `USER_NAME()`.
+
+`sql/provision_user.sql` is an idempotent script that creates the user, assigns the role, and (for Teachers/Directors) inserts the division mapping. Required sqlcmd variables: `USER_NAME`, `USER_PASSWORD`, `USER_ROLE` (one of `Teacher_Role`, `Director_Role`, `Technician_Role`), `DIVISION_KEY`.
+
+```sh
+sqlcmd -S sqlserver-bellevue-grp3.database.windows.net -d DevDB -U <admin> -P <pwd> \
+  -i sql/provision_user.sql \
+  -v USER_NAME="teacher.jdupont" \
+     USER_PASSWORD="<initial-password>" \
+     USER_ROLE="Teacher_Role" \
+     DIVISION_KEY="2"
+```
+
+Pass `DIVISION_KEY="0"` for `Technician_Role` — the script skips the mapping insert for technicians since they bypass division filtering.
+
+To rotate a password later: `ALTER USER [teacher.jdupont] WITH PASSWORD = N'<new>';`. To revoke access: `DROP USER [teacher.jdupont];` (also remove their row(s) from `ref_user_division_access`).
 
 ---
 

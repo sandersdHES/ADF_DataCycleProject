@@ -568,13 +568,13 @@ else:
         .withColumn("Class",         col("Classe").cast("string"))
         .withColumn("CostCenter",    col("`Poste de dépenses`").cast("string"))
         .withColumn("Periodicity",   col("`Périodicité`").cast("string"))
-        .withColumn("Remarque",      col("Remarque").cast("string"))
+        .withColumn("Remark",        col("Remarque").cast("string"))
         .select(
             "DateKey", "StartTimeKey", "EndTimeKey", "DurationMinutes",
             "RoomKey", "DivisionKey", "ReservationNo",
             "BookingType", "Codes", "ProfessorMasked", "UserMasked",
             "ActivityType", "Class", "CostCenter", "Periodicity",
-            "RecurrenceStart", "RecurrenceEnd", "Remarque",
+            "RecurrenceStart", "RecurrenceEnd", "Remark",
             # IsRecurring retiré — colonne calculée SQL
         )
         # Rejette les lignes sans FK valide (salle ou division inconnues)

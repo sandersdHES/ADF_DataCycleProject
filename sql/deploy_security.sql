@@ -24,6 +24,10 @@ IF NOT EXISTS (SELECT 1 FROM sys.database_principals WHERE name = N'Technician_R
   CREATE ROLE [Technician_Role];
 GO
 
+IF NOT EXISTS (SELECT 1 FROM sys.database_principals WHERE name = N'Teacher_Role' AND type = 'R')
+  CREATE ROLE [Teacher_Role];
+GO
+
 ----------------------------------------------------------------------
 -- RLS mapping table
 -- Populated manually: one row per Director-level login + allowed DivisionKey.
@@ -146,4 +150,30 @@ GRANT SELECT ON [dbo].[vw_inverter_status_breakdown] TO [Technician_Role];
 GRANT SELECT ON [dbo].[vw_inverter_performance]      TO [Technician_Role];
 GRANT SELECT ON [dbo].[vw_prediction_accuracy]       TO [Technician_Role];
 GRANT SELECT ON [dbo].[vw_weather_vs_production]     TO [Technician_Role];
+GO
+
+----------------------------------------------------------------------
+-- GRANT SELECT — Teacher_Role
+-- Access: reference data, energy/sustainability facts, room bookings,
+-- and the high-level dashboard views.
+-- Row-level: fact_room_booking is filtered by fn_division_security
+-- (teachers must be mapped to one or more DivisionKeys in
+-- ref_user_division_access — same mechanism used for directors).
+-- Excludes: weather forecasts, prediction tables/views, inverter detail
+-- views, electricity tariff. Keeps the role narrower than Director.
+----------------------------------------------------------------------
+
+GRANT SELECT ON [dbo].[dim_date]                TO [Teacher_Role];
+GRANT SELECT ON [dbo].[dim_time]                TO [Teacher_Role];
+GRANT SELECT ON [dbo].[dim_room]                TO [Teacher_Role];
+GRANT SELECT ON [dbo].[dim_division]            TO [Teacher_Role];
+GRANT SELECT ON [dbo].[dim_inverter]            TO [Teacher_Role];
+GRANT SELECT ON [dbo].[dim_inverter_status]     TO [Teacher_Role];
+GRANT SELECT ON [dbo].[fact_solar_production]   TO [Teacher_Role];
+GRANT SELECT ON [dbo].[fact_energy_consumption] TO [Teacher_Role];
+GRANT SELECT ON [dbo].[fact_environment]        TO [Teacher_Role];
+GRANT SELECT ON [dbo].[fact_room_booking]       TO [Teacher_Role];
+GRANT SELECT ON [dbo].[vw_daily_energy_balance] TO [Teacher_Role];
+GRANT SELECT ON [dbo].[vw_building_occupation]  TO [Teacher_Role];
+GRANT SELECT ON [dbo].[vw_kpi_dashboard_home]   TO [Teacher_Role];
 GO
