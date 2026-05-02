@@ -36,11 +36,17 @@
 # COMMAND ----------
 
 # DBTITLE 1,Cell 4
+import logging
+
 from pyspark.sql.functions import (
     col, lit, when, regexp_extract, upper, trim, max as spark_max
 )
 import re
 import time
+
+logger = logging.getLogger(__name__)
+if not logger.handlers:
+    logger.setLevel(logging.INFO)
 
 # ── Azure Data Lake Storage ────────────────────────────────────────────
 storage_account_name = "adlsbellevuegrp3"
@@ -70,7 +76,7 @@ def wake_up_sql(max_wait: int = 120):
     Wakes up Azure SQL Serverless by attempting a simple connection in a loop.
     The database takes ~20-60s to start after a period of inactivity.
     """
-    print("⏳ Checking Azure SQL availability...")
+    logger.info("Checking Azure SQL availability...")
     deadline = time.time() + max_wait
     attempt = 0
     while time.time() < deadline:
@@ -80,12 +86,12 @@ def wake_up_sql(max_wait: int = 120):
                 jdbc_url, sql_user, sql_password
             )
             conn.close()
-            print(f"✅ Azure SQL available (attempt {attempt})")
+            logger.info("Azure SQL available (attempt %d)", attempt)
             return
         except Exception as e:
             if "not currently available" in str(e):
                 elapsed = int(time.time() - (deadline - max_wait))
-                print(f"   Database waking up... ({elapsed}s elapsed, attempt {attempt})")
+                logger.info("Database waking up... (%ds elapsed, attempt %d)", elapsed, attempt)
                 time.sleep(15)
             else:
                 raise  # Other error (auth, network) → fail immediately
@@ -111,8 +117,10 @@ def _jdbc_retry(fn, max_attempts: int = 5, initial_wait: int = 20):
             if "not currently available" in msg or "connection" in msg.lower():
                 if attempt == max_attempts:
                     raise
-                print(f"⚠️  Azure SQL waking up (attempt {attempt}/{max_attempts}) "
-                      f"— retrying in {wait}s...")
+                logger.warning(
+                    "Azure SQL waking up (attempt %d/%d) — retrying in %ds...",
+                    attempt, max_attempts, wait,
+                )
                 time.sleep(wait)
                 wait += initial_wait
             else:
@@ -133,9 +141,9 @@ def exec_sql(statement: str):
             conn.close()
     _jdbc_retry(_run)
 
-print("✅ Configuration loaded.")
-print(f"   Silver : {silver_base}")
-print(f"   Gold   : {sql_server}.database.windows.net / {sql_database}")
+logger.info("Configuration loaded.")
+logger.info("   Silver : %s", silver_base)
+logger.info("   Gold   : %s.database.windows.net / %s", sql_server, sql_database)
 
 # COMMAND ----------
 
@@ -166,7 +174,7 @@ df_inv_new = df_inv_silver.join(df_inv_gold, on="InverterID", how="left_anti")
 new_ids = [row["InverterID"] for row in df_inv_new.collect()]
 
 if not new_ids:
-    print("✅ dim_inverter: no new inverters detected.")
+    logger.info("dim_inverter: no new inverters detected.")
 else:
     for inv_id in new_ids:
         exec_sql(f"""
@@ -176,7 +184,7 @@ else:
             VALUES
                 ({inv_id}, 'INV-{inv_id:02d}', 6.00, 2, NULL, NULL, 1)
         """)
-    print(f"✅ dim_inverter: {len(new_ids)} new inverter(s) inserted → IDs {new_ids}")
+    logger.info("dim_inverter: %d new inverter(s) inserted -> IDs %s", len(new_ids), new_ids)
 
 # COMMAND ----------
 
@@ -213,7 +221,7 @@ STATUS_LABELS = {
 new_codes = [row["StatusCode"] for row in df_status_new.collect()]
 
 if not new_codes:
-    print("✅ dim_inverter_status: no new codes detected.")
+    logger.info("dim_inverter_status: no new codes detected.")
 else:
     for code in new_codes:
         label, category, is_failure, requires_maint = STATUS_LABELS.get(
@@ -226,7 +234,7 @@ else:
             VALUES
                 ({code}, '{label}', '{category}', {is_failure}, {requires_maint})
         """)
-    print(f"✅ dim_inverter_status: {len(new_codes)} new code(s) inserted → {new_codes}")
+    logger.info("dim_inverter_status: %d new code(s) inserted -> %s", len(new_codes), new_codes)
 
 # Sentinel 99 (always present for missing FKs)
 exec_sql("""
@@ -249,7 +257,7 @@ exec_sql("""
 # COMMAND ----------
 
 # DBTITLE 1,Cell 10
-# ⚠️  Known site coordinates — extend if new sites appear
+# Known site coordinates — extend if new sites appear
 SITE_META = {
     "Sion":    {"desc": "MeteoSwiss Station — Sion (VS). Southwest reference.",
                 "is_synthetic": 0, "lat": 46.2167, "lon": 7.3500, "alt": 482},
@@ -276,7 +284,7 @@ if "Sierre" not in [row["SiteName"] for row in df_sites_gold.collect()]:
     new_sites.append("Sierre")
 
 if not new_sites:
-    print("✅ dim_weather_site: no new sites detected.")
+    logger.info("dim_weather_site: no new sites detected.")
 else:
     for site in new_sites:
         meta = SITE_META.get(site, {
@@ -293,7 +301,7 @@ else:
             VALUES
                 ('{site}', '{meta["desc"]}', {meta["is_synthetic"]}, {lat}, {lon}, {alt}, 'CH')
         """)
-    print(f"✅ dim_weather_site: {len(new_sites)} new site(s) inserted → {new_sites}")
+    logger.info("dim_weather_site: %d new site(s) inserted -> %s", len(new_sites), new_sites)
 
 # COMMAND ----------
 
@@ -330,7 +338,7 @@ df_meas_new  = df_meas_silver.join(df_meas_gold, on="MeasurementCode", how="left
 new_measurements = df_meas_new.collect()
 
 if not new_measurements:
-    print("✅ dim_measurement_type: no new measurement types detected.")
+    logger.info("dim_measurement_type: no new measurement types detected.")
 else:
     for row in new_measurements:
         code = row["MeasurementCode"].replace("'", "''")
@@ -348,7 +356,7 @@ else:
                 ('{code}', '{name}', '{category}', '{unit_ref}',
                  'Automatically inserted — description to be completed.', {is_driver})
         """)
-    print(f"✅ dim_measurement_type: {len(new_measurements)} new type(s) inserted.")
+    logger.info("dim_measurement_type: %d new type(s) inserted.", len(new_measurements))
 
 # COMMAND ----------
 
@@ -364,6 +372,7 @@ else:
 # COMMAND ----------
 
 # DBTITLE 1,Cell 14
+# Source values from bookings CSV — do not translate (used as join keys against the Division column).
 DIVISION_META = {
     "Haute école de Gestion":
         ("HEG",     "HEG Valais-Wallis",          1),
@@ -389,7 +398,7 @@ df_div_new  = df_div_silver.join(df_div_gold, on="DivisionName", how="left_anti"
 new_divisions = df_div_new.collect()
 
 if not new_divisions:
-    print("✅ dim_division: no new divisions detected.")
+    logger.info("dim_division: no new divisions detected.")
 else:
     for row in new_divisions:
         name_raw = row["DivisionName"]
@@ -407,7 +416,7 @@ else:
             INSERT INTO dim_division (DivisionCode, DivisionName, SchoolName, IsActive)
             VALUES ('{code}', '{name_sql}', '{school.replace("'","''")}', {is_active})
         """)
-    print(f"✅ dim_division: {len(new_divisions)} new division(s) inserted.")
+    logger.info("dim_division: %d new division(s) inserted.", len(new_divisions))
 
 # COMMAND ----------
 
@@ -467,7 +476,7 @@ df_rooms_new  = df_rooms_silver.join(df_rooms_gold, on="RoomCode", how="left_ant
 new_rooms     = df_rooms_new.collect()
 
 if not new_rooms:
-    print("✅ dim_room: no new rooms detected.")
+    logger.info("dim_room: no new rooms detected.")
 else:
     for row in new_rooms:
         code = row["RoomCode"]
@@ -485,7 +494,7 @@ else:
                 ('{code_sql}', '{code_sql}', 'Bellevue', 'VS-BEL',
                  {wing}, {floor}, {room}, '{p["room_type"]}', NULL, 1)
         """)
-    print(f"✅ dim_room: {len(new_rooms)} new room(s) inserted.")
+    logger.info("dim_room: %d new room(s) inserted.", len(new_rooms))
 
 # COMMAND ----------
 
@@ -508,10 +517,10 @@ try:
     config_path = f"{config_base}/ml_models_config.json"
     raw = dbutils.fs.head(config_path, 65536)
     models = json.loads(raw)
-    print(f"✅ ML config loaded: {len(models)} model(s).")
+    logger.info("ML config loaded: %d model(s).", len(models))
 except Exception as e:
     # File missing → default values (first deployment)
-    print(f"⚠️  ML config not found ({e}) — using default values.")
+    logger.warning("ML config not found (%s) — using default values.", e)
     models = [
         {
             "ModelCode": "PV_PROD_V1",
@@ -561,7 +570,7 @@ for m in models:
                 ('{code}', '{name}', '{mtype}', '{target}', '{features}',
                  '{train_start}', '{train_end}', {is_active}, '{notes}')
         """)
-        print(f"✅ dim_prediction_model: new model '{code}' inserted.")
+        logger.info("dim_prediction_model: new model '%s' inserted.", code)
     else:
         # Check if ModelType or Features changed → UPDATE
         old = existing[code]
@@ -571,7 +580,7 @@ for m in models:
                 SET ModelType = '{mtype}', Features = '{features}', Notes = '{notes}'
                 WHERE ModelCode = '{code}'
             """)
-            print(f"✅ dim_prediction_model: model '{code}' updated (type or features changed).")
+            logger.info("dim_prediction_model: model '%s' updated (type or features changed).", code)
 
 # COMMAND ----------
 
@@ -591,7 +600,7 @@ try:
     tariff_path = f"{config_base}/electricity_tariff_config.json"
     raw_tariff  = dbutils.fs.head(tariff_path, 4096)
     tariff_cfg  = json.loads(raw_tariff)
-    print(f"✅ Tariff config loaded.")
+    logger.info("Tariff config loaded.")
 except Exception:
     tariff_cfg = {
         "TariffName":      "Standard HES-SO Valais",
@@ -599,7 +608,7 @@ except Exception:
         "EffectiveFrom":   "2023-01-01",
         "Notes":           "Initial tariff 0.15 CHF/kWh — from Bellevue dashboard."
     }
-    print("⚠️  Tariff config not found — using default tariff (0.15 CHF/kWh).")
+    logger.warning("Tariff config not found — using default tariff (0.15 CHF/kWh).")
 
 # Get active tariff (EffectiveTo IS NULL)
 df_tariff_gold = read_gold("ref_electricity_tariff").filter(col("EffectiveTo").isNull())
@@ -614,7 +623,7 @@ if not active:
             ('{tariff_cfg["TariffName"]}', {tariff_cfg["PricePerKwh_CHF"]},
              '{tariff_cfg["EffectiveFrom"]}', NULL,
              '{tariff_cfg.get("Notes","").replace("'","''")}')""")
-    print(f"✅ ref_electricity_tariff: initial tariff inserted ({tariff_cfg['PricePerKwh_CHF']} CHF/kWh).")
+    logger.info("ref_electricity_tariff: initial tariff inserted (%s CHF/kWh).", tariff_cfg['PricePerKwh_CHF'])
 elif float(active[0]["PricePerKwh_CHF"]) != float(tariff_cfg["PricePerKwh_CHF"]):
     # Tariff change → SCD2: close old, insert new
     exec_sql(f"""
@@ -629,9 +638,9 @@ elif float(active[0]["PricePerKwh_CHF"]) != float(tariff_cfg["PricePerKwh_CHF"])
             ('{tariff_cfg["TariffName"]}', {tariff_cfg["PricePerKwh_CHF"]},
              '{tariff_cfg["EffectiveFrom"]}', NULL,
              '{tariff_cfg.get("Notes","").replace("'","''")}')""")
-    print(f"✅ ref_electricity_tariff: new tariff {tariff_cfg['PricePerKwh_CHF']} CHF/kWh active.")
+    logger.info("ref_electricity_tariff: new tariff %s CHF/kWh active.", tariff_cfg['PricePerKwh_CHF'])
 else:
-    print(f"✅ ref_electricity_tariff: tariff unchanged ({active[0]['PricePerKwh_CHF']} CHF/kWh).")
+    logger.info("ref_electricity_tariff: tariff unchanged (%s CHF/kWh).", active[0]['PricePerKwh_CHF'])
 
 # COMMAND ----------
 
@@ -649,12 +658,12 @@ dims = [
     "dim_prediction_model", "ref_electricity_tariff",
 ]
 
-print("=" * 55)
-print(f"{'Table':<30} {'Rows':>8}  {'Last Update':>14}")
-print("=" * 55)
+logger.info("=" * 55)
+logger.info("%-30s %8s  %14s", "Table", "Rows", "Last Update")
+logger.info("=" * 55)
 for dim in dims:
     df = read_gold(dim)
     n  = df.count()
-    print(f"  {dim:<28} {n:>8}")
-print("=" * 55)
-print("✅ Step 1B completed — all Gold dimensions are up to date.")
+    logger.info("  %-28s %8d", dim, n)
+logger.info("=" * 55)
+logger.info("Step 1B completed — all Gold dimensions are up to date.")

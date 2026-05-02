@@ -40,6 +40,8 @@
 # COMMAND ----------
 
 # DBTITLE 1,Cell 4
+import logging
+
 from pyspark.sql.functions import (
     col, lit, year, month, hour, minute, dayofweek,
     when, coalesce, to_timestamp, date_format,
@@ -50,6 +52,10 @@ from pyspark.sql.functions import (
 from pyspark.sql.window import Window
 from pyspark.sql import DataFrame
 import datetime
+
+logger = logging.getLogger(__name__)
+if not logger.handlers:
+    logger.setLevel(logging.INFO)
 
 storage_account_name = "adlsbellevuegrp3"
 storage_account_key  = dbutils.secrets.get(scope="keyvault-scope", key="adls-access-key")
@@ -62,8 +68,8 @@ spark.conf.set(
 silver_base = f"abfss://silver@{storage_account_name}.dfs.core.windows.net"
 ml_base     = f"abfss://mldata@{storage_account_name}.dfs.core.windows.net"
 
-print(f"✅ Silver : {silver_base}")
-print(f"✅ ML     : {ml_base}")
+logger.info("Silver : %s", silver_base)
+logger.info("ML     : %s", ml_base)
 
 # COMMAND ----------
 
@@ -94,7 +100,7 @@ df_solar = (
     .orderBy("timestamp")
 )
 
-print(f"✅ solar_aggregated   : {df_solar.count():,} rows")
+logger.info("solar_aggregated   : %s rows", f"{df_solar.count():,}")
 df_solar.show(3, truncate=False)
 
 # COMMAND ----------
@@ -120,7 +126,7 @@ df_conso = (
     .orderBy("timestamp")
 )
 
-print(f"✅ consumption        : {df_conso.count():,} rows")
+logger.info("consumption        : %s rows", f"{df_conso.count():,}")
 df_conso.show(3, truncate=False)
 
 # COMMAND ----------
@@ -191,7 +197,7 @@ df_weather_pivot = (
     .orderBy("timestamp_3h")
 )
 
-print(f"✅ weather (3h pivot) : {df_weather_pivot.count():,} rows")
+logger.info("weather (3h pivot) : %s rows", f"{df_weather_pivot.count():,}")
 df_weather_pivot.show(3, truncate=False)
 
 # COMMAND ----------
@@ -245,7 +251,7 @@ df_weather_15min = (
     .filter(col("irradiance_wm2").isNotNull())  # Remove slots before first weather measurement
 )
 
-print(f"✅ weather (15min ff) : {df_weather_15min.count():,} rows")
+logger.info("weather (15min ff) : %s rows", f"{df_weather_15min.count():,}")
 df_weather_15min.show(3, truncate=False)
 
 # COMMAND ----------
@@ -274,7 +280,8 @@ df_bookings_raw = (
     .select("Date", "Heure_Debut", "Heure_Fin", "Nom")
 )
 
-# Convert French dates → start and end timestamps
+# Convert French dates → start and end timestamps.
+# Source values from bookings CSV — do not translate (regex matches actual French data).
 french_months_map = [
     ("janv\\.", "Jan"), ("févr\\.", "Feb"), ("mars", "Mar"),
     ("avr\\.",  "Apr"), ("mai",     "May"), ("juin", "Jun"),
@@ -305,7 +312,7 @@ df_bookings = (
 
 # Total distinct known rooms (denominator for occupation rate)
 total_rooms = df_bookings.select("room_code").distinct().count()
-print(f"   Total distinct rooms: {total_rooms}")
+logger.info("Total distinct rooms: %d", total_rooms)
 
 # Generate all 15-min slots covered by each booking
 # Each slot = timestamp rounded down to the nearest 15-min where the room is occupied
@@ -343,7 +350,7 @@ df_occupation = (
     )
 )
 
-print(f"✅ room occupation    : {df_occupation.count():,} slots")
+logger.info("room occupation    : %s slots", f"{df_occupation.count():,}")
 df_occupation.show(3, truncate=False)
 
 # COMMAND ----------
@@ -427,9 +434,12 @@ df_us29 = (
 )
 
 n_us29 = df_us29.count()
-print(f"✅ US#29 dataset : {n_us29:,} rows")
-print(f"   Period       : {df_us29.agg({'timestamp': 'min'}).collect()[0][0]} "
-      f"→ {df_us29.agg({'timestamp': 'max'}).collect()[0][0]}")
+logger.info("US#29 dataset : %s rows", f"{n_us29:,}")
+logger.info(
+    "   Period       : %s -> %s",
+    df_us29.agg({'timestamp': 'min'}).collect()[0][0],
+    df_us29.agg({'timestamp': 'max'}).collect()[0][0],
+)
 df_us29.show(5, truncate=False)
 
 # COMMAND ----------
@@ -483,9 +493,12 @@ df_us30 = (
 )
 
 n_us30 = df_us30.count()
-print(f"✅ US#30 dataset : {n_us30:,} rows")
-print(f"   Period       : {df_us30.agg({'timestamp': 'min'}).collect()[0][0]} "
-      f"→ {df_us30.agg({'timestamp': 'max'}).collect()[0][0]}")
+logger.info("US#30 dataset : %s rows", f"{n_us30:,}")
+logger.info(
+    "   Period       : %s -> %s",
+    df_us30.agg({'timestamp': 'min'}).collect()[0][0],
+    df_us30.agg({'timestamp': 'max'}).collect()[0][0],
+)
 df_us30.show(5, truncate=False)
 
 # COMMAND ----------
@@ -512,13 +525,13 @@ output_us30 = f"{ml_base}/knime_input/consumption_features"
 # Delete old version before writing (idempotence)
 try:
     dbutils.fs.rm(output_us29, recurse=True)
-    print(f"🗑️  Old version deleted: {output_us29}")
+    logger.info("Old version deleted: %s", output_us29)
 except Exception:
     pass
 
 try:
     dbutils.fs.rm(output_us30, recurse=True)
-    print(f"🗑️  Old version deleted: {output_us30}")
+    logger.info("Old version deleted: %s", output_us30)
 except Exception:
     pass
 
@@ -533,7 +546,7 @@ except Exception:
     .option("encoding", "UTF-8")
     .csv(output_us29)
 )
-print(f"✅ Exported → {output_us29}  ({n_us29:,} rows)")
+logger.info("Exported -> %s  (%s rows)", output_us29, f"{n_us29:,}")
 
 # Export US#30 — Consumption
 (
@@ -546,7 +559,7 @@ print(f"✅ Exported → {output_us29}  ({n_us29:,} rows)")
     .option("encoding", "UTF-8")
     .csv(output_us30)
 )
-print(f"✅ Exported → {output_us30}  ({n_us30:,} rows)")
+logger.info("Exported -> %s  (%s rows)", output_us30, f"{n_us30:,}")
 
 # COMMAND ----------
 
@@ -557,9 +570,9 @@ print(f"✅ Exported → {output_us30}  ({n_us30:,} rows)")
 # COMMAND ----------
 
 # DBTITLE 1,Untitled
-print("=" * 70)
-print("EXPORT SUMMARY — ml_export_to_knime.py")
-print("=" * 70)
+logger.info("=" * 70)
+logger.info("EXPORT SUMMARY — ml_export_to_knime.py")
+logger.info("=" * 70)
 
 for path, label, n in [
     (output_us29, "solar_production_features.csv  [US#29]", n_us29),
@@ -568,24 +581,22 @@ for path, label, n in [
     files = dbutils.fs.ls(path)
     csv_files = [f for f in files if f.name.endswith(".csv")]
     size_kb = csv_files[0].size // 1024 if csv_files else 0
-    print(f"\n  {label}")
-    print(f"    Rows    : {n:,}")
-    print(f"    Size    : ~{size_kb:,} KB")
-    print(f"    Path    : {path}/")
+    logger.info("  %s", label)
+    logger.info("    Rows    : %s", f"{n:,}")
+    logger.info("    Size    : ~%s KB", f"{size_kb:,}")
+    logger.info("    Path    : %s/", path)
 
-print()
-print("US#29 Schema (KNIME features):")
+logger.info("US#29 Schema (KNIME features):")
 df_us29.printSchema()
 
-print("US#30 Schema (KNIME features):")
+logger.info("US#30 Schema (KNIME features):")
 df_us30.printSchema()
 
-print()
-print("=" * 70)
-print("Expected KNIME OUTPUT format (for ml_load_predictions.py — US#31):")
-print("  knime_output/production_predictions.csv")
-print("    → columns: timestamp (yyyy-MM-dd HH:mm:ss), predicted_production_kwh")
-print("  knime_output/consumption_predictions.csv")
-print("    → columns: timestamp (yyyy-MM-dd HH:mm:ss), predicted_consumption_kwh")
-print("=" * 70)
-print("✅ Export complete — KNIME can start.")
+logger.info("=" * 70)
+logger.info("Expected KNIME OUTPUT format (for ml_load_predictions.py — US#31):")
+logger.info("  knime_output/production_predictions.csv")
+logger.info("    -> columns: timestamp (yyyy-MM-dd HH:mm:ss), predicted_production_kwh")
+logger.info("  knime_output/consumption_predictions.csv")
+logger.info("    -> columns: timestamp (yyyy-MM-dd HH:mm:ss), predicted_consumption_kwh")
+logger.info("=" * 70)
+logger.info("Export complete — KNIME can start.")

@@ -16,6 +16,12 @@
 
 # COMMAND ----------
 
+import logging
+
+logger = logging.getLogger(__name__)
+if not logger.handlers:
+    logger.setLevel(logging.INFO)
+
 storage_account_name = "adlsbellevuegrp3"
 storage_account_key  = dbutils.secrets.get(scope="keyvault-scope", key="adls-access-key")
 
@@ -43,8 +49,8 @@ jdbc_props = {
     "driver":   "com.microsoft.sqlserver.jdbc.SQLServerDriver",
 }
 
-print(f"✅ ADLS SAC target : {sac_base}")
-print(f"✅ Azure SQL       : {sql_server}.database.windows.net / {sql_database}")
+logger.info("ADLS SAC target : %s", sac_base)
+logger.info("Azure SQL       : %s.database.windows.net / %s", sql_server, sql_database)
 
 # COMMAND ----------
 
@@ -86,7 +92,7 @@ df_combined = spark.read.jdbc(
 )
  
 n_combined = df_combined.count()
-print(f"✅ Combined (status + performance) : {n_combined:,} rows")
+logger.info("Combined (status + performance) : %s rows", f"{n_combined:,}")
 
 # COMMAND ----------
 
@@ -102,7 +108,7 @@ final_combined = f"{sac_base}/sac_inverter_combined.csv"
 for path in [tmp_combined, final_combined]:
     try:
         dbutils.fs.rm(path, recurse=True)
-        print(f"🗑️  Removed: {path}")
+        logger.info("Removed: %s", path)
     except Exception:
         pass
 
@@ -137,7 +143,7 @@ def promote_csv(tmp_dir, final_path, label):
         raise FileNotFoundError(f"No CSV found in {tmp_dir}")
     dbutils.fs.mv(part_csv[0], final_path)
     dbutils.fs.rm(tmp_dir, recurse=True)
-    print(f"✅ {label} → {final_path}")
+    logger.info("%s -> %s", label, final_path)
 
 promote_csv(tmp_combined, final_combined, f"sac_inverter_combined.csv ({n_combined:,} rows)")
 
@@ -148,15 +154,15 @@ promote_csv(tmp_combined, final_combined, f"sac_inverter_combined.csv ({n_combin
 
 # COMMAND ----------
 
-print("=" * 70)
-print("SAC EXPORT SUMMARY")
-print("=" * 70)
-
 info    = dbutils.fs.ls(final_combined)
 size_kb = info[0].size // 1024
-print(f"\n  sac_inverter_combined.csv  [US#25 — failures + performance]")
-print(f"    Rows   : {n_combined:,}")
-print(f"    Size   : ~{size_kb:,} KB")
-print(f"    Path   : {final_combined}")
-print("\n✅ Export complete — download sac_inverter_combined.csv from ADLS sacexport/ and upload to SAC.")
-print("=" * 70)
+
+logger.info("=" * 70)
+logger.info("SAC EXPORT SUMMARY")
+logger.info("=" * 70)
+logger.info("  sac_inverter_combined.csv  [US#25 — failures + performance]")
+logger.info("    Rows   : %s", f"{n_combined:,}")
+logger.info("    Size   : ~%s KB", f"{size_kb:,}")
+logger.info("    Path   : %s", final_combined)
+logger.info("Export complete — download sac_inverter_combined.csv from ADLS sacexport/ and upload to SAC.")
+logger.info("=" * 70)

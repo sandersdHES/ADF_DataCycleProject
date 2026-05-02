@@ -36,12 +36,18 @@
 # COMMAND ----------
 
 # DBTITLE 1,Cell 4
+import logging
+
 from pyspark.sql.functions import (
     col, sha2, to_timestamp, concat_ws, when, lit, mean,
     explode, array, struct, regexp_extract, regexp_replace,
     coalesce, lag, translate, date_format,
 )
 from pyspark.sql.window import Window
+
+logger = logging.getLogger(__name__)
+if not logger.handlers:
+    logger.setLevel(logging.INFO)
 
 storage_account_name = "adlsbellevuegrp3"
 storage_account_key  = dbutils.secrets.get(scope="keyvault-scope", key="adls-access-key")
@@ -54,8 +60,8 @@ spark.conf.set(
 bronze_base = f"abfss://bronze@{storage_account_name}.dfs.core.windows.net"
 silver_base = f"abfss://silver@{storage_account_name}.dfs.core.windows.net"
 
-print(f"✅ Bronze: {bronze_base}")
-print(f"✅ Silver: {silver_base}")
+logger.info("Bronze: %s", bronze_base)
+logger.info("Silver: %s", silver_base)
 
 # COMMAND ----------
 
@@ -186,7 +192,7 @@ df_solar_inverters = (
 )
 
 df_solar_inverters.write.mode("overwrite").parquet(f"{silver_base}/solar_inverters/")
-print(f"✅ solar_inverters   → {df_solar_inverters.count():,} rows")
+logger.info("solar_inverters   -> %s rows", f"{df_solar_inverters.count():,}")
 
 # COMMAND ----------
 
@@ -255,7 +261,7 @@ df_solar_agg = (
 )
 
 df_solar_agg.write.mode("overwrite").parquet(f"{silver_base}/solar_aggregated/")
-print(f"✅ solar_aggregated  → {df_solar_agg.count():,} rows")
+logger.info("solar_aggregated  -> %s rows", f"{df_solar_agg.count():,}")
 
 # COMMAND ----------
 
@@ -283,12 +289,12 @@ df_sierre = (
 )
 
 df_sierre.write.mode("overwrite").parquet(f"{silver_base}/weather_forecasts/")
-print(f"✅ weather_forecasts → {df_sierre.count():,} rows")
+logger.info("weather_forecasts -> %s rows", f"{df_sierre.count():,}")
 
 df_futureweather_raw = spark.read.csv(f"{bronze_base}/future_forecasts/*.csv", header=True, inferSchema=True)
 
 df_sierre.write.mode("overwrite").parquet(f"{silver_base}/weather_future_forecasts/")
-print(f"✅ future_weather_forecasts → {df_sierre.count():,} rows")
+logger.info("future_weather_forecasts -> %s rows", f"{df_sierre.count():,}")
 
 
 
@@ -345,7 +351,7 @@ df_bookings = (
 # No ad-hoc filter needed here.
 
 df_bookings.write.mode("overwrite").parquet(f"{silver_base}/bookings/")
-print(f"✅ bookings          → {df_bookings.count():,} rows")
+logger.info("bookings          -> %s rows", f"{df_bookings.count():,}")
 
 # COMMAND ----------
 
@@ -436,7 +442,7 @@ def process_vetroz_sensor(
         df = df.withColumn(var_col, col(val_col) - lag(col(val_col), 1).over(w))
 
     df.write.mode("overwrite").parquet(f"{silver_base}/{silver_folder}/")
-    print(f"✅ {silver_folder:<20} → {df.count():,} rows")
+    logger.info("%-20s -> %s rows", silver_folder, f"{df.count():,}")
 
 # COMMAND ----------
 

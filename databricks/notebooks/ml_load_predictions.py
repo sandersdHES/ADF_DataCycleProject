@@ -32,6 +32,8 @@
 # COMMAND ----------
 
 # DBTITLE 1,Cell 4
+import logging
+
 from pyspark.sql.functions import (
     col, lit, to_timestamp, date_format,
     year, month, hour, minute,
@@ -39,6 +41,10 @@ from pyspark.sql.functions import (
 )
 from pyspark.sql import DataFrame
 import time, json
+
+logger = logging.getLogger(__name__)
+if not logger.handlers:
+    logger.setLevel(logging.INFO)
 
 # ── ADLS ──────────────────────────────────────────────────────────────────────
 storage_account_name = "adlsbellevuegrp3"
@@ -85,8 +91,10 @@ def _jdbc_retry(fn, max_attempts: int = 5, initial_wait: int = 20):
             if "not currently available" in msg or "connection" in msg.lower():
                 if attempt == max_attempts:
                     raise
-                print(f"⚠️  Azure SQL waking up (attempt {attempt}/{max_attempts}) "
-                      f"— retrying in {wait}s...")
+                logger.warning(
+                    "Azure SQL waking up (attempt %d/%d) — retrying in %ds...",
+                    attempt, max_attempts, wait,
+                )
                 time.sleep(wait)
                 wait += initial_wait
             else:
@@ -129,9 +137,9 @@ def ts_to_timekey(ts_col):
     return (hour(ts_col) * 60 + minute(ts_col)).cast("short")
 
 
-print("✅ Configuration loaded.")
-print(f"   ML input/output : {ml_base}")
-print(f"   Gold (Azure SQL): {sql_server}.database.windows.net / {sql_database}")
+logger.info("Configuration loaded.")
+logger.info("   ML input/output : %s", ml_base)
+logger.info("   Gold (Azure SQL): %s.database.windows.net / %s", sql_server, sql_database)
 
 # COMMAND ----------
 
@@ -162,7 +170,7 @@ missing_prod       = expected_cols_prod - actual_cols_prod
 
 if missing_prod:
     raise ValueError(
-        f"❌ production_predictions.csv — missing columns: {missing_prod}\n"
+        f"production_predictions.csv — missing columns: {missing_prod}\n"
         f"   Columns found: {actual_cols_prod}\n"
         f"   Check the 'Column Rename' configuration in KNIME workflow US#29."
     )
@@ -181,7 +189,7 @@ df_prod_preds = (
     .orderBy("ts")
 )
 
-print(f"✅ production_predictions: {df_prod_preds.count():,} rows")
+logger.info("production_predictions: %s rows", f"{df_prod_preds.count():,}")
 df_prod_preds.show(3, truncate=False)
 
 # COMMAND ----------
@@ -206,7 +214,7 @@ missing_conso       = expected_cols_conso - actual_cols_conso
 
 if missing_conso:
     raise ValueError(
-        f"❌ consumption_predictions.csv — missing columns: {missing_conso}\n"
+        f"consumption_predictions.csv — missing columns: {missing_conso}\n"
         f"   Columns found: {actual_cols_conso}\n"
         f"   Check the 'Column Rename' configuration in KNIME workflow US#30."
     )
@@ -225,7 +233,7 @@ df_conso_preds = (
     .orderBy("ts")
 )
 
-print(f"✅ consumption_predictions: {df_conso_preds.count():,} rows")
+logger.info("consumption_predictions: %s rows", f"{df_conso_preds.count():,}")
 df_conso_preds.show(3, truncate=False)
 
 # COMMAND ----------
@@ -247,7 +255,7 @@ import datetime
 
 # Pipeline execution date (today)
 run_date_key = int(datetime.date.today().strftime("%Y%m%d"))
-print(f"   PredictionRunDateKey: {run_date_key}")
+logger.info("   PredictionRunDateKey: %d", run_date_key)
 
 # Retrieve ModelKey from dim_prediction_model
 df_models = read_gold("dim_prediction_model").select("ModelKey", "ModelCode").cache()
@@ -258,19 +266,19 @@ model_key_us30 = models_map.get(MODEL_CODE_US30)
 
 if model_key_us29 is None:
     raise ValueError(
-        f"❌ ModelCode '{MODEL_CODE_US29}' not found in dim_prediction_model.\n"
+        f"ModelCode '{MODEL_CODE_US29}' not found in dim_prediction_model.\n"
         f"   Available models: {list(models_map.keys())}\n"
         f"   Run silver_gold_dimensions.py to initialize the dimension."
     )
 if model_key_us30 is None:
     raise ValueError(
-        f"❌ ModelCode '{MODEL_CODE_US30}' not found in dim_prediction_model.\n"
+        f"ModelCode '{MODEL_CODE_US30}' not found in dim_prediction_model.\n"
         f"   Available models: {list(models_map.keys())}\n"
         f"   Run silver_gold_dimensions.py to initialize the dimension."
     )
 
-print(f"✅ ModelKey US#29 (production)  : {model_key_us29}  [{MODEL_CODE_US29}]")
-print(f"✅ ModelKey US#30 (consumption) : {model_key_us30}  [{MODEL_CODE_US30}]")
+logger.info("ModelKey US#29 (production)  : %s  [%s]", model_key_us29, MODEL_CODE_US29)
+logger.info("ModelKey US#30 (consumption) : %s  [%s]", model_key_us30, MODEL_CODE_US30)
 df_models.unpersist()
 
 # COMMAND ----------
@@ -294,7 +302,7 @@ exec_sql(f"""
     DELETE FROM fact_energy_prediction
     WHERE PredictionRunDateKey = {run_date_key}
 """)
-print(f"🗑️  Existing predictions for RunDateKey={run_date_key} deleted.")
+logger.info("Existing predictions for RunDateKey=%d deleted.", run_date_key)
 
 # COMMAND ----------
 
@@ -326,7 +334,7 @@ df_fact_prod = (
 
 n_prod = df_fact_prod.count()
 write_gold(df_fact_prod, "fact_energy_prediction")
-print(f"✅ fact_energy_prediction (production)  : {n_prod:,} rows inserted.")
+logger.info("fact_energy_prediction (production)  : %s rows inserted.", f"{n_prod:,}")
 
 # COMMAND ----------
 
@@ -358,7 +366,7 @@ df_fact_conso = (
 
 n_conso = df_fact_conso.count()
 write_gold(df_fact_conso, "fact_energy_prediction")
-print(f"✅ fact_energy_prediction (consumption): {n_conso:,} rows inserted.")
+logger.info("fact_energy_prediction (consumption): %s rows inserted.", f"{n_conso:,}")
 
 # COMMAND ----------
 
@@ -380,7 +388,7 @@ dates_prod  = [row["DateKey"] for row in df_fact_prod.select("DateKey").distinct
 dates_conso = [row["DateKey"] for row in df_fact_conso.select("DateKey").distinct().collect()]
 all_dates   = sorted(set(dates_prod) | set(dates_conso))
 
-print(f"   Dates to backfill: {len(all_dates)} days")
+logger.info("   Dates to backfill: %d days", len(all_dates))
 
 backfill_ok = 0
 for dk in all_dates:
@@ -391,9 +399,9 @@ for dk in all_dates:
         backfill_ok += 1
     except Exception as e:
         # Non-fatal: actuals for the day may not be available yet
-        print(f"   ⚠️  Backfill skipped for {date_str}: {e}")
+        logger.warning("   Backfill skipped for %s: %s", date_str, e)
 
-print(f"✅ Backfill completed: {backfill_ok}/{len(all_dates)} days processed.")
+logger.info("Backfill completed: %d/%d days processed.", backfill_ok, len(all_dates))
 
 # COMMAND ----------
 
@@ -414,10 +422,10 @@ config_path = f"{ml_base}/ml_models_config.json"
 try:
     raw = dbutils.fs.head(config_path, 65536)
     models_cfg = json.loads(raw)
-    print(f"✅ Existing ML config loaded ({len(models_cfg)} models).")
+    logger.info("Existing ML config loaded (%d models).", len(models_cfg))
 except Exception:
     models_cfg = []
-    print("⚠️  ML config not found — creating new config.")
+    logger.warning("ML config not found — creating new config.")
 
 # Metadata for the KNIME models actually used
 KNIME_MODELS_META = {
@@ -460,15 +468,15 @@ existing_codes = {m["ModelCode"]: i for i, m in enumerate(models_cfg)}
 for code, meta in KNIME_MODELS_META.items():
     if code in existing_codes:
         models_cfg[existing_codes[code]].update(meta)
-        print(f"✅ Config updated: '{code}'")
+        logger.info("Config updated: '%s'", code)
     else:
         models_cfg.append(meta)
-        print(f"✅ Config added  : '{code}'")
+        logger.info("Config added  : '%s'", code)
 
 # Write updated config to ADLS
 updated_json = json.dumps(models_cfg, indent=2, ensure_ascii=False)
 dbutils.fs.put(config_path, updated_json, overwrite=True)
-print(f"✅ ml_models_config.json written → {config_path}")
+logger.info("ml_models_config.json written -> %s", config_path)
 
 # COMMAND ----------
 
@@ -479,9 +487,9 @@ print(f"✅ ml_models_config.json written → {config_path}")
 # COMMAND ----------
 
 # DBTITLE 1,Cell 23
-print("=" * 70)
-print("SUMMARY — ml_load_predictions.py (US#28 + US#31)")
-print("=" * 70)
+logger.info("=" * 70)
+logger.info("SUMMARY — ml_load_predictions.py (US#28 + US#31)")
+logger.info("=" * 70)
 
 # Count by model in fact_energy_prediction
 df_check = spark.read.jdbc(
@@ -514,10 +522,9 @@ df_actuals = spark.read.jdbc(
 )
 
 row = df_actuals.collect()[0]
-print(f"   Total rows inserted     : {row['Total']:,}")
-print(f"   Production actuals      : {row['ProdActuals']:,}")
-print(f"   Consumption actuals     : {row['ConsoActuals']:,}")
-print()
-print("✅ Complete ML pipeline — fact_energy_prediction up to date.")
-print("   → vw_prediction_accuracy is now populated for Power BI.")
-print("=" * 70)
+logger.info("   Total rows inserted     : %s", f"{row['Total']:,}")
+logger.info("   Production actuals      : %s", f"{row['ProdActuals']:,}")
+logger.info("   Consumption actuals     : %s", f"{row['ConsoActuals']:,}")
+logger.info("Complete ML pipeline — fact_energy_prediction up to date.")
+logger.info("   -> vw_prediction_accuracy is now populated for Power BI.")
+logger.info("=" * 70)
