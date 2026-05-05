@@ -429,6 +429,11 @@ SELECT
     d.[Year],
     d.[Month],
     d.MonthName,
+    -- Sort keys for Power BI: month/year axes ordered chronologically rather
+    -- than by raw integer (which causes the "5,6,7,8,9" mislabel when the
+    -- model treats Month as a free-standing dimension).
+    (d.[Year] * 100 + d.[Month])                                           AS YearMonthKey,
+    CONVERT(NCHAR(7), d.FullDate, 126)                                     AS YearMonthLabel,
     d.Quarter,
     d.IsWeekend,
     d.IsAcademicDay,
@@ -486,36 +491,55 @@ GO
 
 CREATE OR ALTER VIEW dbo.vw_kpi_dashboard_home
 AS
+-- Grain: one row per (DateKey, TimeKey) actually present in either the
+-- consumption or production fact. The previous version joined fc on DateKey
+-- only and joined daily inverter aggregates as scalars, which duplicated those
+-- daily values across ~96 timeslots and inflated any SUM in Power BI.
+-- Per-timeslot inverter status is now reported directly; consumers that need
+-- the daily roll-up should aggregate on the fly or use vw_inverter_*.
+WITH slots AS (
+    SELECT DateKey, TimeKey FROM dbo.fact_energy_consumption
+    UNION
+    SELECT DateKey, TimeKey FROM dbo.fact_solar_production
+),
+inv_slot AS (
+    SELECT DateKey,
+           TimeKey,
+           COUNT(*)                    AS InverterReadings,
+           SUM(CAST(IsFailure AS INT)) AS InverterFailures
+    FROM dbo.fact_solar_inverter
+    GROUP BY DateKey, TimeKey
+)
 SELECT
     d.FullDate,
     d.[Year],
     d.[Month],
-    ISNULL(fc.DeltaEnergy_Kwh, 0) * 0.1500         AS Consumption_CHF,
-    ISNULL(fc.DeltaEnergy_Kwh, 0)                  AS Consumption_Kwh,
-    ISNULL(fp.DeltaEnergy_Kwh, 0)                  AS Production_Kwh,
+    t.[Hour],
+    t.[Minute],
+    ISNULL(fc.DeltaEnergy_Kwh, 0) * 0.1500              AS Consumption_CHF,
+    ISNULL(fc.DeltaEnergy_Kwh, 0)                       AS Consumption_Kwh,
+    ISNULL(fp.DeltaEnergy_Kwh, 0)                       AS Production_Kwh,
     env.Temperature_C,
     env.Humidity_Pct,
-    fsi_agg.TotalReadings,
-    fsi_agg.FailureReadings,
-    CASE WHEN fsi_agg.TotalReadings > 0
-         THEN fsi_agg.FailureReadings * 100.0 / fsi_agg.TotalReadings
-         ELSE 0 END                                AS PanelFailureRate_Pct
-FROM dbo.dim_date d
-LEFT JOIN dbo.fact_energy_consumption fc  ON fc.DateKey  = d.DateKey
-LEFT JOIN dbo.dim_time                t   ON t.TimeKey   = fc.TimeKey
-LEFT JOIN dbo.fact_solar_production   fp  ON fp.DateKey  = d.DateKey AND fp.TimeKey = fc.TimeKey
-LEFT JOIN dbo.fact_environment        env ON env.DateKey = d.DateKey AND env.TimeKey = fc.TimeKey
-LEFT JOIN (
-    SELECT DateKey,
-           COUNT(*)                    AS TotalReadings,
-           SUM(CAST(IsFailure AS INT)) AS FailureReadings
-    FROM dbo.fact_solar_inverter
-    GROUP BY DateKey
-) fsi_agg ON fsi_agg.DateKey = d.DateKey;
+    ISNULL(inv_slot.InverterReadings, 0)                AS InverterReadings,
+    ISNULL(inv_slot.InverterFailures, 0)                AS InverterFailures,
+    CASE WHEN ISNULL(inv_slot.InverterReadings, 0) > 0
+         THEN inv_slot.InverterFailures * 100.0 / inv_slot.InverterReadings
+         ELSE 0 END                                     AS PanelFailureRate_Pct
+FROM slots s
+JOIN dbo.dim_date                  d   ON d.DateKey   = s.DateKey
+JOIN dbo.dim_time                  t   ON t.TimeKey   = s.TimeKey
+LEFT JOIN dbo.fact_energy_consumption fc  ON fc.DateKey  = s.DateKey AND fc.TimeKey = s.TimeKey
+LEFT JOIN dbo.fact_solar_production   fp  ON fp.DateKey  = s.DateKey AND fp.TimeKey = s.TimeKey
+LEFT JOIN dbo.fact_environment        env ON env.DateKey = s.DateKey AND env.TimeKey = s.TimeKey
+LEFT JOIN inv_slot                        ON inv_slot.DateKey = s.DateKey AND inv_slot.TimeKey = s.TimeKey;
 GO
 
 CREATE OR ALTER VIEW dbo.vw_weather_vs_production
 AS
+-- Driven from fact_solar_production (one row per recorded 15-min slot) instead
+-- of dim_date × dim_time (which previously emitted ~96 mostly-NULL rows per
+-- date and inflated downstream COUNT/AVG measures in Power BI).
 SELECT
     d.FullDate,
     d.[Year],
@@ -528,19 +552,18 @@ SELECT
     wf_temp.ForecastValue                          AS ForecastTemp_C,
     env.Temperature_C                              AS ActualIndoorTemp_C,
     env.Humidity_Pct                               AS ActualHumidity_Pct
-FROM dbo.dim_date d
-JOIN dbo.dim_time t ON 1 = 1
-LEFT JOIN dbo.fact_solar_production fp
-       ON fp.DateKey = d.DateKey AND fp.TimeKey = t.TimeKey
+FROM dbo.fact_solar_production fp
+JOIN dbo.dim_date d ON d.DateKey = fp.DateKey
+JOIN dbo.dim_time t ON t.TimeKey = fp.TimeKey
 LEFT JOIN dbo.fact_environment env
-       ON env.DateKey = d.DateKey AND env.TimeKey = t.TimeKey
+       ON env.DateKey = fp.DateKey AND env.TimeKey = fp.TimeKey
 LEFT JOIN dbo.fact_weather_forecast wf_irr
-       ON wf_irr.DateKey = d.DateKey AND wf_irr.TimeKey = t.TimeKey
+       ON wf_irr.DateKey = fp.DateKey AND wf_irr.TimeKey = fp.TimeKey
       AND wf_irr.PredictionHorizon = 0
       AND wf_irr.SiteKey = (SELECT SiteKey FROM dbo.dim_weather_site WHERE SiteName = N'Sierre')
       AND wf_irr.MeasurementKey = (SELECT MeasurementKey FROM dbo.dim_measurement_type WHERE MeasurementCode = N'PRED_GLOB_ctrl')
 LEFT JOIN dbo.fact_weather_forecast wf_temp
-       ON wf_temp.DateKey = d.DateKey AND wf_temp.TimeKey = t.TimeKey
+       ON wf_temp.DateKey = fp.DateKey AND wf_temp.TimeKey = fp.TimeKey
       AND wf_temp.PredictionHorizon = 0
       AND wf_temp.SiteKey = wf_irr.SiteKey
       AND wf_temp.MeasurementKey = (SELECT MeasurementKey FROM dbo.dim_measurement_type WHERE MeasurementCode = N'PRED_T_2M_ctrl');

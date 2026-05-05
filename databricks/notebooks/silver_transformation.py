@@ -252,12 +252,30 @@ df_solar_agg_filtered = (
     )
 )
 
-df_solar_agg = (
+# Solar PV is a cumulative kWh meter, identical in spirit to the consumption
+# meter further down. The source `delta_value` column is unreliable (units differ
+# from the cumulative reading and the per-row value resets daily), so we derive
+# the true 15-min increment from `cumulative_reading` via lag(), with the same
+# overflow/reset handling as `process_vetroz_sensor(..., is_cumulative_meter=True)`.
+df_solar_agg_parsed = (
     _parse_timestamp(df_solar_agg_filtered)
     .withColumn("cumulative_reading", regexp_extract(col("cumulative_reading"), r"(-?\d+\.?\d*)", 1).cast("double"))
     .withColumn("delta_value",        regexp_extract(col("delta_value"),        r"(-?\d+\.?\d*)", 1).cast("double"))
     .dropna(subset=["timestamp"])
-    .dropDuplicates()
+    .dropDuplicates(["timestamp"])
+)
+
+_w_solar = Window.partitionBy(lit(1)).orderBy("timestamp")
+df_solar_agg = (
+    df_solar_agg_parsed
+    .withColumn("_prev", lag("cumulative_reading", 1).over(_w_solar))
+    .withColumn(
+        "delta_value",
+        when(col("_prev").isNull(), lit(None).cast("double"))
+        .when(col("cumulative_reading") < col("_prev"), lit(None).cast("double"))  # reset/overflow
+        .otherwise(col("cumulative_reading") - col("_prev")),
+    )
+    .drop("_prev")
 )
 
 df_solar_agg.write.mode("overwrite").parquet(f"{silver_base}/solar_aggregated/")
@@ -417,28 +435,35 @@ def process_vetroz_sensor(
         .withColumn(val_col, regexp_extract(col(val_col), r"(-?\d+\.?\d*)", 1).cast("double"))
         .withColumn(var_col, regexp_extract(col(var_col), r"(-?\d+\.?\d*)", 1).cast("double"))
         .dropna(subset=["timestamp"])
-        .dropDuplicates()
+        # One physical sensor per folder: collapse overlapping monthly extracts
+        # so the window function below sees a clean monotonic series.
+        .dropDuplicates(["timestamp"])
     )
+
+    # Window must have a partition: without one, Spark warns and (more
+    # importantly) lag() ordering becomes non-deterministic across partitions.
+    # A constant lit(1) keeps everything in one logical partition while pinning
+    # the order, which is correct for a single-sensor monotonic time series.
+    w = Window.partitionBy(lit(1)).orderBy("timestamp")
 
     # ── Cumulative counter: recalculate delta and handle overflow ──────────
     if is_cumulative_meter:
-        w = Window.orderBy("timestamp")
         df = (
             df
             .withColumn("_prev", lag(val_col, 1).over(w))
             .withColumn(
                 var_col,
-                when(col("_prev").isNotNull(),
-                    when(col(val_col) < col("_prev"), lit(None))   # reset detected → null
-                    .otherwise(col(val_col) - col("_prev"))        # normal delta
-                )
+                # First row of the series → no previous reading, delta is unknown.
+                when(col("_prev").isNull(), lit(None).cast("double"))
+                # Counter went backwards → reset/overflow, do not emit a spike.
+                .when(col(val_col) < col("_prev"), lit(None).cast("double"))
+                .otherwise(col(val_col) - col("_prev"))
             )
             .drop("_prev")
         )
 
     # ── Instantaneous sensor: var_col == val_col in source → true delta ────────
     if compute_real_delta:
-        w = Window.orderBy("timestamp")
         df = df.withColumn(var_col, col(val_col) - lag(col(val_col), 1).over(w))
 
     df.write.mode("overwrite").parquet(f"{silver_base}/{silver_folder}/")
