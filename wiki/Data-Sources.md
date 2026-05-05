@@ -81,6 +81,10 @@ One file per day named `DD.MM.YYYY-PV.csv`, semicolon-delimited, **UTF-16 LE wit
 
 Because the meter is **cumulative**, a counter reset (power outage or meter replacement) produces a negative `Variation`. `silver_transformation.py` detects the decrease and sets the delta to `null`; downstream facts re-derive it via `lag()`.
 
+> **Coverage range.** `*-PV.csv` extracts cover **2023-01-01 → 2023-02-19** only — exports stopped on 19 Feb. For 2023-02-20 onwards, `fact_solar_production` is backfilled from per-inverter `min*.csv` data (see [[Databricks Notebooks]] §silver_gold_facts.py).
+
+> **xx:00 absence at source.** The Vetroz aggregator records 72 readings per day at +15 / +30 / +45 within each hour — the xx:00 timestamp is never written. `silver_transformation.py` synthesises an xx:00 row by linearly interpolating the cumulative reading, restoring a uniform **96-slot/day cadence** in Silver and Gold.
+
 ---
 
 ### Energy consumption (`*-Consumption.csv`)
@@ -97,6 +101,10 @@ One file per day, semicolon-delimited, **UTF-16 LE with BOM**. Identical structu
 
 The same counter-reset null logic applies. Not every 15-minute slot is guaranteed to be present — gaps appear during weekends or sensor outages.
 
+> **xx:00 absence at source.** Same 72-readings-per-day pattern as the PV meter. `silver_transformation.py` synthesises the xx:00 slot by linear interpolation of `cumulative_reading`.
+
+> **Known bronze data gaps.** Four 2023 days have no consumption file at the source: **2023-02-16**, **2023-03-01**, **2023-04-01**, **2023-05-01**. These days appear as missing rows in all dashboards — the pipeline does not invent data across these gaps.
+
 ---
 
 ### Indoor temperature (`*-Temperature.csv`)
@@ -111,6 +119,8 @@ One file per day, semicolon-delimited, **UTF-16 LE with BOM**. Point-in-time rea
 | `Valeur Acquisition` | decimal | Indoor ambient temperature at the time of reading |
 | `Variation` | decimal | Difference from the previous reading (not used downstream — `silver_transformation.py` re-derives the delta via `lag()`) |
 
+> **xx:00 absence at source.** Same 72-readings-per-day pattern. `silver_transformation.py` synthesises the xx:00 row by linear interpolation of `actual_temp` between surrounding readings, then re-derives the delta via `lag()`.
+
 ---
 
 ### Indoor humidity (`*-Humidity.csv`)
@@ -124,6 +134,8 @@ One file per day, same structure as temperature.
 | `Unité affichage` | string | Unit — always `%` |
 | `Valeur Acquisition` | decimal | Relative indoor humidity at the time of reading |
 | `Variation` | decimal | Difference from the previous reading (not used downstream) |
+
+> **xx:00 absence at source.** Same 72-readings-per-day pattern. `silver_transformation.py` synthesises the xx:00 row by linear interpolation of `actual_humidity`.
 
 > Temperature and humidity do not always share the same timestamps. `silver_gold_facts.py` uses a **FULL OUTER JOIN** when loading `fact_environment` to preserve readings even when only one sensor reported for a given slot.
 

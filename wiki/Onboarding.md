@@ -91,11 +91,13 @@ Read [[Architecture Overview]] and [[ADF Pipelines]] to understand what runs whe
 
 ---
 
-## Pending tasks (from `docs/TODO.md`)
+## Pending tasks
 
-- [ ] Transfer Azure subscription billing ownership to the company account
-- [ ] Delete `adf/publish_config.json` — the `adf_publish` branch is no longer used
-- [ ] Wire `PL_Bronze_MeteoFuture` into `PL_Ingest_Bronze` so future forecasts flow automatically (currently orphaned)
+See [[Known Limitations and Roadmap]] for the full list of open issues and the housekeeping backlog. Key items relevant to new developers:
+
+- Transfer Azure subscription billing ownership to the company account
+- Delete `adf/publish_config.json` — the `adf_publish` branch is no longer used
+- Wire `PL_Bronze_MeteoFuture` into `PL_Ingest_Bronze` so future forecasts flow automatically (currently orphaned)
 
 ---
 

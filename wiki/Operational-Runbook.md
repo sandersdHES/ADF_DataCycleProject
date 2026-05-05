@@ -92,6 +92,31 @@ All pipelines are safe to re-run:
 - **Gold facts** — watermark-based; re-run only ingests data newer than the current `MAX(DateKey)` in each fact table
 - **`ml_load_predictions.py`** — DELETE + re-INSERT for today's `PredictionRunDateKey` (idempotent)
 
+### Re-running xx:00 synthesis after a Silver fix
+
+`silver_transformation.py` synthesises the xx:00 slot for every 30-min gap (96 rows/day). If Silver is corrupted or the synthesis logic is patched:
+
+1. Re-run `silver_transformation.py` to regenerate all Silver Parquet files.
+2. Manually TRUNCATE the affected Gold fact tables in SQL:
+   ```sql
+   TRUNCATE TABLE dbo.fact_energy_consumption;
+   TRUNCATE TABLE dbo.fact_solar_production;
+   TRUNCATE TABLE dbo.fact_environment;
+   ```
+3. Re-run `silver_gold_facts.py` (the watermark is now 0, so it reloads everything).
+
+> ⚠️ TRUNCATE resets the watermark. All downstream views will show no data until the notebook completes.
+
+### Re-running the inverter Pac backfill
+
+`fact_solar_production` rows loaded from per-inverter `min*.csv` (2023-02-20 onwards) have `CumulativeEnergy_Kwh IS NULL`. To force a full reload of the backfill period:
+
+1. Delete only the backfill rows:
+   ```sql
+   DELETE FROM dbo.fact_solar_production WHERE CumulativeEnergy_Kwh IS NULL;
+   ```
+2. Re-run `silver_gold_facts.py` — the LEFT ANTI JOIN in the two-pass load will re-insert the missing rows.
+
 ---
 
 ## Useful links

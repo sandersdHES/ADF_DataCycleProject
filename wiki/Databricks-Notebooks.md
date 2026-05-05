@@ -31,6 +31,7 @@ Reads raw CSVs from `bronze/` and writes cleaned, deduplicated **Parquet** to `s
 | Dual date parsing | `regexp_extract` + `coalesce` handles both `dd.MM.yy` and `dd.MM.yyyy` |
 | Solar unpivot | Input has 5 inverter columns per row (`pac_1..5`, `daysum_1..5` etc.). Notebook builds a 5-element array of structs and `explode()`s into one row per inverter |
 | Counter-reset logic | Consumption and PV values are cumulative counters. When the counter decreases (reset or meter replacement), delta is set to `null` — downstream facts recompute via `lag()` |
+| **xx:00 synthesis** (`_synthesize_xx00_rows`) | The Vetroz aggregator emits 72 readings/day at +15/+30/+45 — xx:00 is never written. Where two consecutive readings are exactly 30 min apart, the helper injects a synthetic xx:00 row whose value is linearly interpolated. After synthesis every healthy day has **96 rows** in Silver and Gold. Only exact 30-min gaps are synthesised; DST jumps and multi-hour outages are left untouched. |
 | Synthetic Sierre weather | No station at the Sierre campus. Averages Sion + Visp forecasts; the sentinel value −99,999 is replaced with `null` before averaging |
 | GDPR masking | SHA-256 hash on `Professeur` / `Nom de l'utilisateur` booking columns → `ProfessorMasked` / `UserMasked` |
 
@@ -49,25 +50,25 @@ Reads raw CSVs from `bronze/` and writes cleaned, deduplicated **Parquet** to `s
 | `udc1` / `udc2` | DOUBLE | DC voltage from generator strings 1 and 2 (V) |
 | `is_failure` | BOOLEAN | `true` when `status_code == 14` |
 
-**`silver/solar_aggregated/`** — one row per 15-minute PV meter reading
+**`silver/solar_aggregated/`** — one row per 15-minute PV meter reading (96 rows/day after xx:00 synthesis)
 
 | Column | Type | Description |
 |---|---|---|
-| `timestamp` | TIMESTAMP | Reading time |
-| `cumulative_reading` | DOUBLE | Cumulative kWh total — monotonically increasing |
+| `timestamp` | TIMESTAMP | Reading time. Includes synthesised xx:00 rows (linearly interpolated). |
+| `cumulative_reading` | DOUBLE | Cumulative kWh total — monotonically increasing. Synthesised xx:00 rows carry the midpoint value. |
 | `delta_value` | DOUBLE | kWh since previous reading; `null` when a counter reset is detected |
 
-**`silver/consumption/`** — same schema as `solar_aggregated`; measures building kWh consumed.
+**`silver/consumption/`** — same schema as `solar_aggregated`; measures building kWh consumed. Same xx:00 synthesis applies (96 rows/day).
 
-**`silver/temperature/`** — one row per 15-minute indoor temperature reading
+**`silver/temperature/`** — one row per 15-minute indoor temperature reading (96 rows/day after xx:00 synthesis)
 
 | Column | Type | Description |
 |---|---|---|
-| `timestamp` | TIMESTAMP | Reading time |
-| `actual_temp` | DOUBLE | Indoor ambient temperature (°C) |
+| `timestamp` | TIMESTAMP | Reading time. Includes synthesised xx:00 rows. |
+| `actual_temp` | DOUBLE | Indoor ambient temperature (°C). Synthesised xx:00 rows carry a linearly-interpolated value. |
 | `temp_delta` | DOUBLE | Change since the previous reading, re-derived via `lag()` — the source `Variation` column duplicates `Valeur Acquisition` and is not usable |
 
-**`silver/humidity/`** — same schema as `temperature`; columns are `actual_humidity` (%) and `humidity_delta`.
+**`silver/humidity/`** — same schema as `temperature`; columns are `actual_humidity` (%) and `humidity_delta`. Same xx:00 synthesis applies.
 
 **`silver/weather_forecasts/`** and **`silver/weather_future_forecasts/`** — one row per (time, measurement type); `Site` is always `"Sierre"` (synthetic)
 
@@ -125,13 +126,22 @@ Loads 7 fact tables incrementally. **Watermark pattern:** `SELECT MAX(DateKey) F
 
 | Fact table | Grain | Special logic |
 |---|---|---|
-| `fact_solar_inverter` | `(DateKey, TimeKey, InverterKey)` | Status coalesced to sentinel `StatusKey = 99` when lookup fails |
-| `fact_solar_production` | `(DateKey, TimeKey)` | `RetailValue_CHF = DeltaEnergy_Kwh × 0.15` is a SQL-side computed column |
+| `fact_solar_inverter` | `(DateKey, TimeKey, InverterKey)` | Status coalesced to sentinel `StatusKey = 99` when lookup fails. `DayEnergy_Kwh` stored in **kWh** — source `daysum` is in Wh and is divided by 1 000 on load. |
+| `fact_solar_production` | `(DateKey, TimeKey)` | **Two-pass load** — see below. `RetailValue_CHF = DeltaEnergy_Kwh × 0.15` is a SQL-side computed column |
 | `fact_energy_consumption` | `(DateKey, TimeKey)` | `CostCHF = DeltaEnergy_Kwh × 0.15` is a SQL-side computed column |
 | `fact_environment` | `(DateKey, TimeKey)` | **FULL OUTER JOIN** between temp and humidity Silver tables — preserves readings when only one sensor reported |
 | `fact_weather_forecast` | `(DateKey, TimeKey, SiteKey, MeasurementKey, PredictionHorizon)` | 3-hour data loaded as-is; interpolation to 15-min happens in KNIME |
 | `fact_room_booking` | Surrogate `BookingKey`; natural on `(DateKey, StartTimeKey, RoomKey, ReservationNo)` | French dates parsed via `french_date_to_english`; `IsRecurring` SQL-computed |
 | `fact_energy_prediction` | `(DateKey, TimeKey, ModelKey, PredictionRunDateKey)` | Loaded by `ml_load_predictions.py`, not this notebook |
+
+**`fact_solar_production` — two-pass load:**
+
+| Pass | Source | Date range | Notes |
+|---|---|---|---|
+| **2** | `silver/solar_aggregated/` (`*-PV.csv`) | 2023-01-01 → 2023-02-19 | Direct 15-min readings; `CumulativeEnergy_Kwh` and `DeltaEnergy_Kwh` taken from Silver. |
+| **2b** *(backfill)* | `silver/solar_inverters/` (per-inverter `min*.csv`) | 2023-02-20 onwards | Integrates instantaneous `Pac` (W) across all 5 inverters into 15-min buckets: `DeltaEnergy_Kwh = Σ(Pac_W) / 12 000`. Rows already from pass 2 excluded via LEFT ANTI JOIN. `CumulativeEnergy_Kwh` is NULL (meter total not available from inverter export). |
+
+`Pac` is used instead of `daysum` because at least one inverter has been observed with a stuck daily counter while still physically generating.
 
 **Key engineering notes:**
 - `DateKey = yyyyMMdd` (INT); `TimeKey = hour×60 + minute` (SMALLINT)

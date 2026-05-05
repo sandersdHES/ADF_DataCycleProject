@@ -89,7 +89,37 @@ The DDL creates shells for both tables but does not populate them. Fact table jo
 
 ---
 
-## Housekeeping backlog (from `docs/TODO.md`)
+### Bronze data gaps — four missing consumption days
+
+The on-premises source has no consumption file for **2023-02-16**, **2023-03-01**, **2023-04-01**, and **2023-05-01**. The pipeline does not interpolate across gaps — these days simply have no rows in `fact_energy_consumption` or any derived view.
+
+**Impact:** Dashboards show a break in the consumption series on those four dates. The missing-day pattern also causes the next day's 00:15 reading to carry a ≈30-hour delta instead of ≈15 minutes.
+
+**Fix:** No pipeline change planned. Document the gaps as a known data-quality exception.
+
+---
+
+### `*-PV.csv` solar aggregated source ends 2023-02-19
+
+The Vetroz metering system stopped exporting `*-PV.csv` files after **2023-02-19**. Solar production from **2023-02-20 onwards** is backfilled by integrating the per-inverter `Pac` readings from `min*.csv`: `DeltaEnergy_Kwh = Σ(Pac_W) / 12 000`. `CumulativeEnergy_Kwh` is NULL for all backfill rows (no cumulative meter total available from the inverter export).
+
+**Impact:** Pre- and post-cutover rows differ in schema completeness. The self-sufficiency ratio and CHF cost calculations in `vw_daily_energy_balance` use only `DeltaEnergy_Kwh`, which is populated for both periods.
+
+**Fix (if needed):** Re-activate or replace the PV aggregator export. Until then, the backfill approach is the authoritative production source.
+
+---
+
+### xx:00 synthesis is interpolated, not measured
+
+`silver_transformation.py` injects a synthetic xx:00 row for every exact **30-minute gap** between consecutive readings (`_synthesize_xx00_rows`). The synthetic value is a linear midpoint of the surrounding cumulative readings — it is not a real sensor measurement.
+
+**Impact:** DST transitions (where the 30-min gap does not hold) and multi-hour outages are left untouched, so those days may have fewer than 96 rows. Aggregations that sum `DeltaEnergy_Kwh` over a day can undercount during such periods.
+
+**Fix (if needed):** Add explicit DST gap handling (e.g. 30→45-min gap at clock change) or accept the known undercounting on two DST days per year.
+
+---
+
+## Housekeeping backlog
 
 - [ ] Delete `adf/publish_config.json`
 - [ ] Fix `weather_future_forecasts` Silver: process `df_futureweather_raw` instead of writing `df_sierre`

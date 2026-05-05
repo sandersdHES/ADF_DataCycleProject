@@ -16,7 +16,14 @@ The Gold layer lives in **Azure SQL serverless Gen5** (`sqlserver-bellevue-grp3.
 - **Integer surrogate keys for date and time.** `DateKey = yyyyMMdd` (INT); `TimeKey = hour × 60 + minute` (SMALLINT). Makes fact/dim joins cheap and partition-friendly.
 - **Computed columns are SQL-persisted**, not computed in Spark. Notebooks omit them from INSERT column lists and let the engine calculate them on write.
 - **No lineage columns.** Fact tables are append-only with no `LoadBatchId` or `IngestedAt`. Watermark re-runs are safe but audit trails rely only on DB timestamps.
-- **All Gold column names are English.** The Silver layer mirrors the French source CSV (e.g. `Remarque`, `Périodicité`); the Databricks Silver→Gold notebook maps them to English at the Gold boundary (`Remark`, `Periodicity`, etc.).
+- **All Gold column names are English.** The Silver layer mirrors the French source CSV column names; the Databricks Silver→Gold notebook maps them to English at the Gold boundary:
+
+  | Silver (French source) | Gold (English) |
+  |---|---|
+  | `Remarque` | `Remark` (renamed via `sp_rename` in `deploy_schema.sql`) |
+  | `Périodicité` | `Periodicity` |
+  | `Heure_Debut` / `Heure_Fin` | `StartTimeKey` / `EndTimeKey` (parsed to minutes-from-midnight INT) |
+  | `Date_Recurrence_Debut` / `Date_Recurrence_Fin` | `RecurrenceStart` / `RecurrenceEnd` (parsed to DATE) |
 
 ---
 
@@ -56,12 +63,12 @@ ref_user_division_access   (RLS mapping — Directors / Teachers ↔ Divisions)
 ### `dim_date`
 `DateKey INT (PK)` | `FullDate DATE` | `Year` | `Quarter` | `Month` | `MonthName` | `MonthShort` | `WeekOfYear` | `DayOfMonth` | `DayOfWeek` | `DayName` | `IsWeekend` | `IsSwissHoliday` | `HolidayName` | `Season` | `AcademicYear` | `AcademicSemester` | `IsAcademicDay`
 
-Populated separately (not by these notebooks).
+> ⚠️ Populated separately — not by the Bronze/Silver/Gold notebooks. CI deploys the DDL but inserts no rows. Run `step1a_calculated_dimensions.sql` manually after first deploy. See [[Known Limitations and Roadmap]].
 
 ### `dim_time`
 `TimeKey SMALLINT (PK)` | `TimeLabel NCHAR(5)` | `Hour` | `Minute` | `QuarterHourSlot` | `HalfHourSlot` | `HourSlot` | `TimePeriod` | `IsBusinessHour` | `IsLectureHour`
 
-Populated separately.
+> ⚠️ Same as `dim_date` — populated separately via `step1a_calculated_dimensions.sql`.
 
 ### `dim_inverter`
 `InverterKey INT IDENTITY (PK)` | `InverterID INT UNIQUE` | `InverterName` | `RatedPower_kWp` | `StringCount` | `RoofSection` | `InstallDate` | `IsActive`
@@ -100,6 +107,30 @@ On tariff change: old row `EffectiveTo = today-1`; new row inserted. See [[Known
 | `fact_room_booking` | Surrogate `BookingKey IDENTITY (PK)`; natural uniqueness on `(DateKey, StartTimeKey, RoomKey, ReservationNo)` |
 | `fact_energy_prediction` | `(DateKey, TimeKey, ModelKey, PredictionRunDateKey)` |
 
+**`fact_room_booking` columns:**
+
+| Column | Type | Notes |
+|---|---|---|
+| `BookingKey` | INT IDENTITY (PK) | Surrogate key |
+| `DateKey` | INT | FK → `dim_date` |
+| `StartTimeKey` | SMALLINT | FK → `dim_time`; parsed from `Heure_Debut` |
+| `EndTimeKey` | SMALLINT | FK → `dim_time`; parsed from `Heure_Fin` |
+| `DurationMinutes` | SMALLINT | `EndTimeKey − StartTimeKey` |
+| `RoomKey` | INT | FK → `dim_room` |
+| `DivisionKey` | INT | FK → `dim_division` |
+| `ReservationNo` | NVARCHAR | Source `Rés.-no` |
+| `BookingType` | NVARCHAR | Source `Type de réservation` |
+| `Codes` | NVARCHAR | Source `Codes` |
+| `ProfessorMasked` | CHAR(64) | SHA-256 of `Professeur` — hashed in Silver |
+| `UserMasked` | CHAR(64) | SHA-256 of `Nom de l'utilisateur` — hashed in Silver |
+| `ActivityType` | NVARCHAR | Source `Activité` |
+| `Class` | NVARCHAR | Source `Classe` |
+| `CostCenter` | NVARCHAR | Source `Poste de dépenses` |
+| `Periodicity` | NVARCHAR | Source `Périodicité` (e.g. `w` = weekly) |
+| `RecurrenceStart` / `RecurrenceEnd` | DATE | Source `Date_Recurrence_Debut/Fin` |
+| `Remark` | NVARCHAR(MAX) | Source `Remarque`; renamed at Gold boundary |
+| `IsRecurring` | BIT COMPUTED | SQL-persisted: `1` when `RecurrenceStart IS NOT NULL` |
+
 **SQL-persisted computed columns (not in notebook INSERT lists):**
 - `fact_solar_production.RetailValue_CHF = DeltaEnergy_Kwh × 0.15`
 - `fact_energy_consumption.CostCHF = DeltaEnergy_Kwh × 0.15`
@@ -119,8 +150,9 @@ On tariff change: old row `EffectiveTo = today-1`; new row inserted. See [[Known
 ### Power BI dashboard views
 | View | Dashboard target |
 |---|---|
-| `vw_daily_energy_balance` | Home tab — production vs. consumption time-series, net balance, self-sufficiency ratio, CHF costs |
-| `vw_building_occupation` | Rooms tab — occupation % per room per academic day (denominator = 720 min teaching day) |
+| `vw_daily_energy_balance` | Home tab — production vs. consumption time-series, net balance, self-sufficiency ratio, CHF costs. Production and consumption CTEs pre-aggregate to day grain before joining, preventing many-to-many fan-out from the 96-slot/day cadence. |
+| `vw_building_occupation` | Rooms tab — occupation % per room per academic day (denominator = **600 min, 10-hour window 08:00–18:00**) |
+| `vw_building_occupation_hourly` | Rooms tab — hour-level occupation heatmap per room; grain = `(FullDate, RoomKey, Hour)`; `OccupationPct = BookedMinutesInHour / 60 × 100` |
 | `vw_kpi_dashboard_home` | Home tab — all five KPI cards in one query (consumption CHF, temperature, panel failure rate, occupation, humidity) |
 | `vw_weather_vs_production` | Weather/Solar tab — irradiance forecast vs. actual PV output per 15-min slot |
 
