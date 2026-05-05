@@ -33,6 +33,7 @@ Home
 ├── User Handbook — Solar Inverter Dashboard
 ├── User Handbook — Room Occupancy Dashboard
 ├── User Handbook — SAC Dashboard
+├── User Handbook — Energy & Financial Overview
 ├── Data Privacy & GDPR
 └── Known Limitations & Roadmap
 ```
@@ -382,6 +383,28 @@ Then one section per notebook — copy from §5.1–§5.6, including:
 - Technician daily check routine and fault investigation procedure
 - **Data refresh workflow:** automated schedule + 3-step manual import via Azure Storage Explorer → SAC model
 - Glossary of technical terms
+
+---
+
+### User Handbook — Energy & Financial Overview (`User-Handbook-Energy-Financial.md`)
+
+**Purpose:** End-user guide for the Power BI Energy & Financial Overview dashboard.  
+**Source:** `docs/USER_HANDBOOK_ENERGY_FINANCIAL.md` — copy in full  
+**Assets:** `docs/assets/energy-financial/` (5 dashboard screenshots)  
+**Content:**
+- Data controls: Date Range Selector and Granularity Selector (Daily / Weekly / Monthly)
+- Five KPI cards: Total Production, Total Consumption, Net Energy Balance, Cost Avoided, Net Financial Impact — each with measure name, source table, and colour border
+- Bar chart: Daily Production vs Consumption — data sources, how to read (green vs blue bars), what to look for (faults, spikes, structural grid dependency)
+- Donut chart: CHF Financial Breakdown — three segments (Savings, Grid cost, Tariff reference) with measures and interpretation
+- Area chart: Consumption Pattern by Time of Day — aggregate view, daily activity profile, operational insight
+
+| Image file | Content |
+|---|---|
+| `dashboard-overview.png` | Full dashboard screenshot |
+| `kpi-cards.png` | Five KPI summary cards |
+| `production-vs-consumption.png` | Production vs Consumption bar chart |
+| `chf-financial-breakdown.png` | CHF Financial Breakdown donut chart |
+| `consumption-by-hour.png` | Consumption Pattern by Time of Day area chart |
 
 ---
 

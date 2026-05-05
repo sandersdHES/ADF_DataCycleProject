@@ -107,6 +107,7 @@ ADF_DataCycleProject/
 │   ├── USER_HANDBOOK_DASHBOARD.md    # End-user guide for the Solar Inverter dashboard
 │   ├── USER_HANDBOOK_ROOM_OCCUPANCY.md # End-user guide for the Room Occupancy dashboard
 │   ├── USER_HANDBOOK_SAC_DASHBOARD.md  # End-user guide for the SAC Solar Panel dashboard
+│   ├── USER_HANDBOOK_ENERGY_FINANCIAL.md # End-user guide for the Energy & Financial Overview dashboard
 │   ├── DATA_PRIVACY_GDPR.md          # GDPR compliance statement
 │   ├── WIKI_PLAN.md                  # Planned GitHub Wiki structure & source mapping
 │   ├── assets/                       # Screenshots used by the user handbooks
@@ -128,6 +129,7 @@ ADF_DataCycleProject/
 - [User Handbook — Solar Inverter Dashboard](docs/USER_HANDBOOK_DASHBOARD.md) — how to navigate and interpret the Solar Inverter Operations & Performance Dashboard.
 - [User Handbook — Room Occupancy Dashboard](docs/USER_HANDBOOK_ROOM_OCCUPANCY.md) — how to navigate and interpret the Room Occupancy & Utilization Dashboard.
 - [User Handbook — SAC Dashboard](docs/USER_HANDBOOK_SAC_DASHBOARD.md) — how to navigate the SAP Analytics Cloud Solar Panel Overview dashboard, including daily refresh procedure.
+- [User Handbook — Energy & Financial Overview](docs/USER_HANDBOOK_ENERGY_FINANCIAL.md) — how to navigate the Power BI Energy & Financial Overview dashboard (production, consumption, and CHF breakdown).
 - [Data Privacy & GDPR Statement](docs/DATA_PRIVACY_GDPR.md) — data protection policies, anonymization protocols, and legal basis for processing.
 - [Infrastructure Deploy Runbook](infrastructure/DEPLOY.md) — full from-scratch rebuild procedure (Bicep + OIDC + bacpac + SHIR).
 - [Wiki](https://github.com/sandersdHES/ADF_DataCycleProject/wiki) — browsable reference pages: architecture, data sources, pipeline catalog, notebook reference, DWH schema, ML lifecycle, CI/CD, operational runbook, and more.
