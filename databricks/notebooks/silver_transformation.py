@@ -304,14 +304,24 @@ df_solar_agg_parsed = _synthesize_xx00_rows(df_solar_agg_parsed, "cumulative_rea
 _w_solar = Window.partitionBy(lit(1)).orderBy("timestamp")
 df_solar_agg = (
     df_solar_agg_parsed
-    .withColumn("_prev", lag("cumulative_reading", 1).over(_w_solar))
+    .withColumn("_prev",    lag("cumulative_reading", 1).over(_w_solar))
+    .withColumn("_prev_ts", lag("timestamp",          1).over(_w_solar))
+    .withColumn(
+        "_gap_min",
+        (unix_timestamp("timestamp") - unix_timestamp("_prev_ts")) / 60,
+    )
     .withColumn(
         "delta_value",
         when(col("_prev").isNull(), lit(None).cast("double"))
         .when(col("cumulative_reading") < col("_prev"), lit(None).cast("double"))  # reset/overflow
+        # Gap > 30 min: previous reading is from a different day or after an
+        # outage. The cumulative jump across that gap is not a 15-min delta —
+        # null it out so it does not inflate dashboards (see fact_solar_production
+        # post-missing-day artefact).
+        .when(col("_gap_min") > 30, lit(None).cast("double"))
         .otherwise(col("cumulative_reading") - col("_prev")),
     )
-    .drop("_prev")
+    .drop("_prev", "_prev_ts", "_gap_min")
 )
 
 df_solar_agg.write.mode("overwrite").parquet(f"{silver_base}/solar_aggregated/")
@@ -490,21 +500,47 @@ def process_vetroz_sensor(
     if is_cumulative_meter:
         df = (
             df
-            .withColumn("_prev", lag(val_col, 1).over(w))
+            .withColumn("_prev",    lag(val_col,    1).over(w))
+            .withColumn("_prev_ts", lag("timestamp", 1).over(w))
+            .withColumn(
+                "_gap_min",
+                (unix_timestamp("timestamp") - unix_timestamp("_prev_ts")) / 60,
+            )
             .withColumn(
                 var_col,
                 # First row of the series → no previous reading, delta is unknown.
                 when(col("_prev").isNull(), lit(None).cast("double"))
                 # Counter went backwards → reset/overflow, do not emit a spike.
                 .when(col(val_col) < col("_prev"), lit(None).cast("double"))
+                # Gap > 30 min: cumulative jump across a missing-day or DST/outage
+                # window is not a 15-min delta — null it out instead of dumping
+                # the multi-hour cumulative into a single slot.
+                .when(col("_gap_min") > 30, lit(None).cast("double"))
                 .otherwise(col(val_col) - col("_prev"))
             )
-            .drop("_prev")
+            .drop("_prev", "_prev_ts", "_gap_min")
         )
 
     # ── Instantaneous sensor: var_col == val_col in source → true delta ────────
     if compute_real_delta:
-        df = df.withColumn(var_col, col(val_col) - lag(col(val_col), 1).over(w))
+        df = (
+            df
+            .withColumn("_prev",    lag(col(val_col), 1).over(w))
+            .withColumn("_prev_ts", lag("timestamp",  1).over(w))
+            .withColumn(
+                "_gap_min",
+                (unix_timestamp("timestamp") - unix_timestamp("_prev_ts")) / 60,
+            )
+            .withColumn(
+                var_col,
+                when(col("_prev").isNull(), lit(None).cast("double"))
+                # Same gap rule — a temperature change measured over a 30-hour
+                # window is not a 15-min delta.
+                .when(col("_gap_min") > 30, lit(None).cast("double"))
+                .otherwise(col(val_col) - col("_prev"))
+            )
+            .drop("_prev", "_prev_ts", "_gap_min")
+        )
 
     df.write.mode("overwrite").parquet(f"{silver_base}/{silver_folder}/")
     logger.info("%-20s -> %s rows", silver_folder, f"{df.count():,}")
