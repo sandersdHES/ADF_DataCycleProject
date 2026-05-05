@@ -42,6 +42,7 @@ from pyspark.sql.functions import (
     col, sha2, to_timestamp, concat_ws, when, lit, mean,
     explode, array, struct, regexp_extract, regexp_replace,
     coalesce, lag, translate, date_format,
+    unix_timestamp, expr,
 )
 from pyspark.sql.window import Window
 
@@ -244,6 +245,39 @@ def _parse_timestamp(df):
     )
 
 
+def _synthesize_xx00_rows(df, val_col):
+    """Vetroz meters never emit xx:00 — they only write at xx:15, xx:30, xx:45.
+
+    This leaves the xx:15 cumulative jump spanning a 30-minute window
+    (from xx-1:45) and inflates the lag-derived delta 2x relative to its
+    neighbors. Wherever two consecutive readings are exactly 30 minutes
+    apart, insert a synthetic row at the missing xx:00 with `val_col`
+    set to the linear midpoint of the surrounding readings. The downstream
+    lag-based delta recomputation then yields a clean 15-min delta on both
+    halves. Other gaps (DST jumps, multi-hour outages, dataset start) are
+    intentionally left untouched.
+    """
+    w = Window.partitionBy(lit(1)).orderBy("timestamp")
+    aug = (
+        df
+        .withColumn("_prev_ts",  lag("timestamp", 1).over(w))
+        .withColumn("_prev_val", lag(val_col,    1).over(w))
+        .withColumn(
+            "_gap_min",
+            (unix_timestamp("timestamp") - unix_timestamp("_prev_ts")) / 60,
+        )
+    )
+    synthetic = (
+        aug
+        .filter(col("_gap_min") == 30)
+        .withColumn("timestamp", col("timestamp") - expr("INTERVAL 15 MINUTES"))
+        .withColumn(val_col, (col("_prev_val") + col(val_col)) / 2)
+        .drop("_prev_ts", "_prev_val", "_gap_min")
+    )
+    original = aug.drop("_prev_ts", "_prev_val", "_gap_min")
+    return original.unionByName(synthetic)
+
+
 df_solar_agg_filtered = (
     _read_utf16_sensor(f"{bronze_base}/solar/*-PV.csv", "cumulative_reading", "delta_value")
     .filter(
@@ -264,6 +298,8 @@ df_solar_agg_parsed = (
     .dropna(subset=["timestamp"])
     .dropDuplicates(["timestamp"])
 )
+
+df_solar_agg_parsed = _synthesize_xx00_rows(df_solar_agg_parsed, "cumulative_reading")
 
 _w_solar = Window.partitionBy(lit(1)).orderBy("timestamp")
 df_solar_agg = (
@@ -439,6 +475,10 @@ def process_vetroz_sensor(
         # so the window function below sees a clean monotonic series.
         .dropDuplicates(["timestamp"])
     )
+
+    # Insert synthetic xx:00 rows so every hour has 4 slots; downstream lag()
+    # then derives a clean 15-min delta on both halves of the former 30-min jump.
+    df = _synthesize_xx00_rows(df, val_col)
 
     # Window must have a partition: without one, Spark warns and (more
     # importantly) lag() ordering becomes non-deterministic across partitions.
