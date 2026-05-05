@@ -501,6 +501,7 @@ LEFT JOIN dbo.dim_time     t_start ON t_start.TimeKey = frb.StartTimeKey
 LEFT JOIN dbo.dim_time     t_end   ON t_end.TimeKey   = frb.EndTimeKey
 LEFT JOIN dbo.dim_division div     ON div.DivisionKey = frb.DivisionKey
 WHERE d.IsAcademicDay = 1
+  AND d.FullDate <= '2023-05-31'   -- project scope: Spring 2023 semester only
 GROUP BY d.FullDate, d.[Year], d.[Month], d.MonthName, d.WeekOfYear,
          d.DayName, d.IsWeekend, d.IsAcademicDay,
          r.RoomCode, r.[Floor], r.Wing, r.RoomType,
@@ -567,6 +568,7 @@ LEFT JOIN booking_hour_overlap bho
 LEFT JOIN dbo.dim_division div
        ON div.DivisionKey = bho.DivisionKey
 WHERE d.IsAcademicDay = 1
+  AND d.FullDate <= '2023-05-31'   -- project scope: Spring 2023 semester only
 GROUP BY d.FullDate, d.[Year], d.[Month], d.MonthName, d.WeekOfYear,
          d.DayName, d.IsWeekend, d.IsAcademicDay,
          r.RoomCode, r.[Floor], r.Wing, r.RoomType,

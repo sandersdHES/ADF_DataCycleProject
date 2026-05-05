@@ -611,6 +611,9 @@ df_booking_silver = (
     .withColumn("DateKey", date_format(col("ts_date"), "yyyyMMdd").cast("int"))
     .filter(col("DateKey").isNotNull())  # Drop invalid dates (NULL)
     .filter(col("DateKey") > wm_booking)
+    # Recurring bookings in the source CSV can have occurrence rows extending
+    # beyond the project's academic scope. Cap at end of Spring 2023 semester.
+    .filter(col("DateKey") <= 20230531)
 )
 
 if df_booking_silver.isEmpty():
