@@ -1,73 +1,50 @@
 -- =============================================================================
--- Refresh fact_energy_consumption after fixing the four MM.DD.YYYY-named
--- consumption files in silver_transformation.py.
+-- Restore fact_energy_consumption to a clean state after a corrupted
+-- silver/gold reload.
 --
--- Until the fix, four bronze files used American date order in both their
--- filename and their Date_Raw column:
---    02.16.2023-Consumption.csv   (Feb 16)
---    03.01.2023-Consumption.csv   (Mar 1)
---    04.01.2023-Consumption.csv   (Apr 1)
---    05.01.2023-Consumption.csv   (May 1)
---
--- The dd.MM.yyyy parser either rejected them (Feb 16: month=16 invalid → all
--- rows dropped) or quietly relabeled their data as Jan 3 / Jan 4 / Jan 5,
--- where dropDuplicates(["timestamp"]) collided them with the real Jan files
--- and lost the misclassified rows.
---
--- After the silver fix, the four dates parse to their intended DateKey. To
--- pick them up in gold, wipe rows from DateKey >= 20230216 so the
--- watermark drops below Feb 16 and the next silver_gold_facts.py run
--- re-imports the corrected silver layer.
---
--- The Jan 3/4/5 rows already in gold should be intact (the misclassified
--- May/Apr/Mar rows did not survive dedup with cumulative_reading values
--- ~100k kWh higher than Jan). The verification block at the bottom checks
--- this; if any of those days look polluted, uncomment the optional DELETE.
+-- Context: a bad silver_transformation.py run mislabeled Jan 3/4/5 data as
+-- Mar/Apr/May 1, inflating monthly consumption 3–20×. Silver has since been
+-- reverted and re-run cleanly. This script resets the gold watermark so
+-- silver_gold_facts.py can re-import the correct data.
 --
 -- Run order
 -- ---------
---   1. Apply the silver_transformation.py change.
---   2. Re-run silver_transformation.py in Databricks.
---   3. Run this script with COMMIT.
---   4. Re-run silver_gold_facts.py.
---   5. Verify with the SELECT block at the bottom.
---
--- ROLLBACK is the default for a dry run; flip to COMMIT to apply.
+--   1. Confirm silver_transformation.py on branch claude/fix-solar-data-St3Z0
+--      has already been re-run in Databricks (silver/consumption/ overwritten).
+--   2. Run THIS script (commits immediately — no dry-run wrapper).
+--   3. Re-run silver_gold_facts.py in Databricks.
+--   4. Verify monthly totals with the SELECT at the bottom.
 -- =============================================================================
 
 SET NOCOUNT ON;
 SET XACT_ABORT ON;
 
-BEGIN TRANSACTION;
-
 -- ---------- BEFORE ----------------------------------------------------------
 PRINT '--- BEFORE ---';
-SELECT DateKey,
-       COUNT(*)                        AS row_count,
-       MIN(CumulativeEnergy_Kwh)       AS min_cum,
-       MAX(CumulativeEnergy_Kwh)       AS max_cum
+SELECT [Year], [Month],
+       COUNT(DISTINCT DateKey)           AS days,
+       ROUND(SUM(DeltaEnergy_Kwh), 1)   AS total_kwh
 FROM dbo.fact_energy_consumption
-WHERE DateKey IN (20230103, 20230104, 20230105,
-                  20230216, 20230301, 20230401, 20230501)
-GROUP BY DateKey
-ORDER BY DateKey;
+GROUP BY [Year], [Month]
+ORDER BY [Year], [Month];
 
 -- ---------- DELETE ----------------------------------------------------------
 DELETE FROM dbo.fact_energy_consumption
 WHERE DateKey >= 20230216;
-PRINT CONCAT(N'fact_energy_consumption: ', @@ROWCOUNT, N' rows deleted (DateKey >= 20230216)');
+PRINT CONCAT(N'fact_energy_consumption: deleted ', @@ROWCOUNT, N' rows (DateKey >= 20230216). '
+           + N'Re-run silver_gold_facts.py to reload.');
 
--- Optional: also clear Jan 3/4/5 if the verification step below shows their
--- cumulative_reading was contaminated by the previous misclassified data.
--- Uncomment only if the verification cum values look out of range.
--- DELETE FROM dbo.fact_energy_consumption WHERE DateKey IN (20230103, 20230104, 20230105);
--- PRINT CONCAT(N'fact_energy_consumption: ', @@ROWCOUNT, N' rows deleted (Jan 3/4/5)');
-
--- ---------- AFTER -----------------------------------------------------------
-PRINT '--- AFTER ---';
-SELECT MAX(DateKey) AS new_max_datekey, COUNT(*) AS remaining_rows
+-- ---------- WATERMARK CHECK -------------------------------------------------
+SELECT MAX(DateKey) AS new_max_datekey,
+       COUNT(*)     AS remaining_rows
 FROM dbo.fact_energy_consumption;
+-- Expected: new_max_datekey = 20230215
 
--- Flip ROLLBACK -> COMMIT to apply for real.
-ROLLBACK TRANSACTION;
--- COMMIT TRANSACTION;
+-- ---------- AFTER (run again after silver_gold_facts.py) -------------------
+-- SELECT [Year], [Month],
+--        COUNT(DISTINCT DateKey)           AS days,
+--        ROUND(SUM(DeltaEnergy_Kwh), 1)   AS total_kwh
+-- FROM dbo.fact_energy_consumption
+-- GROUP BY [Year], [Month]
+-- ORDER BY [Year], [Month];
+-- Expected: Jan=43340, Feb=38342, Mar=45009, Apr=39974, May=8243
