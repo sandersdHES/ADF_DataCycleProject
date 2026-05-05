@@ -481,6 +481,8 @@ FROM dbo.dim_date d
 CROSS JOIN dbo.dim_room r
 LEFT JOIN dbo.fact_room_booking frb
        ON frb.DateKey = d.DateKey AND frb.RoomKey = r.RoomKey
+      -- Exclude sentinel rows where the source had no time: StartTimeKey=0, Duration≈1439 min
+      AND NOT (frb.StartTimeKey = 0 AND frb.DurationMinutes >= 1439)
 LEFT JOIN dbo.dim_time     t_start ON t_start.TimeKey = frb.StartTimeKey
 LEFT JOIN dbo.dim_time     t_end   ON t_end.TimeKey   = frb.EndTimeKey
 LEFT JOIN dbo.dim_division div     ON div.DivisionKey = frb.DivisionKey
@@ -519,6 +521,8 @@ booking_hour_overlap AS (
     CROSS JOIN hours h
     WHERE frb.StartTimeKey < (h.HourOfDay + 1) * 60
       AND frb.EndTimeKey   > h.HourOfDay * 60
+      -- Exclude sentinel rows where the source had no time: StartTimeKey=0, Duration≈1439 min
+      AND NOT (frb.StartTimeKey = 0 AND frb.DurationMinutes >= 1439)
 )
 SELECT
     d.FullDate,

@@ -591,6 +591,9 @@ else:
         )
         # Reject rows without a valid FK (unknown room or division).
         .filter(col("RoomKey").isNotNull() & col("DivisionKey").isNotNull())
+        # Reject bookings where time was missing in the source: these arrive
+        # as StartTimeKey=0 / DurationMinutes=1439 (00:00–23:59 sentinel).
+        .filter((col("StartTimeKey") > 0) | (col("DurationMinutes") < 1439))
         .dropDuplicates(["DateKey", "StartTimeKey", "RoomKey", "ReservationNo"])
     )
 
