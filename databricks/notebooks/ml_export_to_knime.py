@@ -47,7 +47,8 @@ from pyspark.sql.functions import (
     when, coalesce, to_timestamp, date_format,
     regexp_replace, regexp_extract, translate,
     concat_ws, mean as spark_mean, count as spark_count,
-    explode, sequence, expr
+    explode, sequence, expr,
+    last, unix_timestamp, sum as F_sum,
 )
 from pyspark.sql.window import Window
 from pyspark.sql import DataFrame
@@ -86,21 +87,53 @@ logger.info("ML     : %s", ml_base)
 # COMMAND ----------
 
 # DBTITLE 1,Untitled
-df_solar = (
+# Pass 1: *-PV.csv aggregated source (Jan 1 – Feb 19 2023)
+df_solar_pv = (
     spark.read.parquet(f"{silver_base}/solar_aggregated/")
     .filter(col("timestamp").isNotNull())
     .filter(col("delta_value").isNotNull())
-    # Exclude outliers (negative production is physically impossible)
     .filter(col("delta_value") >= 0)
     .select(
         col("timestamp"),
         col("delta_value").cast("double").alias("production_delta_kwh"),
     )
+)
+
+# Pass 2: inverter Pac integration (Feb 20 – end of dataset).
+# Mirrors the silver_gold_facts.py pass-2b logic: floor each 5-min
+# inverter reading into its 15-min bucket, sum Pac across all inverters,
+# convert W×5min to kWh via Σ(Pac)/12000.
+df_solar_inv_raw = (
+    spark.read.parquet(f"{silver_base}/solar_inverters/")
+    .filter(col("log_timestamp").isNotNull())
+    .withColumn(
+        "ts15",
+        expr("timestamp_seconds(floor(unix_timestamp(log_timestamp) / 900) * 900)").cast("timestamp"),
+    )
+    .withColumn("ac_power_w", coalesce(col("ac_power_w").cast("double"), lit(0.0)))
+)
+
+df_solar_inv = (
+    df_solar_inv_raw
+    .groupBy("ts15")
+    .agg((F_sum(col("ac_power_w")) / lit(12000.0)).alias("production_delta_kwh"))
+    .withColumnRenamed("ts15", "timestamp")
+    .filter(col("production_delta_kwh") >= 0)
+)
+
+# Union: PV-CSV for slots it covers; inverter data for the rest.
+df_solar = (
+    df_solar_pv
+    .unionByName(
+        df_solar_inv.join(
+            df_solar_pv.select("timestamp"), "timestamp", "left_anti"
+        )
+    )
     .dropDuplicates(["timestamp"])
     .orderBy("timestamp")
 )
 
-logger.info("solar_aggregated   : %s rows", f"{df_solar.count():,}")
+logger.info("solar (pv + inverter): %s rows", f"{df_solar.count():,}")
 df_solar.show(3, truncate=False)
 
 # COMMAND ----------
@@ -240,14 +273,14 @@ w_ff = Window.orderBy("timestamp").rowsBetween(Window.unboundedPreceding, 0)
 
 df_weather_15min = (
     df_weather_joined
-    .withColumn("irradiance_wm2",     coalesce(col("irradiance_wm2"),    lit(None)))
-    .withColumn("irradiance_wm2",     spark_mean("irradiance_wm2").over(w_ff))
-    .withColumn("temp_c",             coalesce(col("temp_c"),            lit(None)))
-    .withColumn("temp_c",             spark_mean("temp_c").over(w_ff))
-    .withColumn("humidity_pct",       coalesce(col("humidity_pct"),      lit(None)))
-    .withColumn("humidity_pct",       spark_mean("humidity_pct").over(w_ff))
-    .withColumn("precipitation_kgm2", coalesce(col("precipitation_kgm2"), lit(None)))
-    .withColumn("precipitation_kgm2", spark_mean("precipitation_kgm2").over(w_ff))
+    # Last-observation-carried-forward: propagate each 3h measurement to the
+    # 11 subsequent 15-min slots until the next measurement arrives.
+    # last(..., ignorenulls=True) over [unbounded preceding → current row]
+    # picks the most recent non-null value, NOT a running average.
+    .withColumn("irradiance_wm2",     last("irradiance_wm2",     ignorenulls=True).over(w_ff))
+    .withColumn("temp_c",             last("temp_c",             ignorenulls=True).over(w_ff))
+    .withColumn("humidity_pct",       last("humidity_pct",       ignorenulls=True).over(w_ff))
+    .withColumn("precipitation_kgm2", last("precipitation_kgm2", ignorenulls=True).over(w_ff))
     .filter(col("irradiance_wm2").isNotNull())  # Remove slots before first weather measurement
 )
 
@@ -370,9 +403,23 @@ def add_time_features(df: DataFrame, ts_col: str = "timestamp") -> DataFrame:
     - month         : 1–12
     - day_of_week   : 1=Sunday … 7=Saturday (Spark convention)
     - is_weekend    : 1 if Saturday or Sunday
-    - is_academic_day : 1 if Monday–Friday (academic period Feb–May 2023)
+    - is_academic_day : 1 if weekday AND not a HES-SO Valais school holiday
     - quarter_hour  : daily slot index 0–95 (identifies the 15-min slot in the day)
+
+    HES-SO Valais Spring 2023 non-academic periods in the dataset window:
+      Carnival:      Feb 20–24 (Mon–Fri school break)
+      Easter break:  Apr 6–21  (Pâques, Valais school holiday)
+      Labour Day:    May 1     (federal public holiday)
     """
+    # Date string for easy comparison (yyyy-MM-dd)
+    date_str = date_format(col(ts_col), "yyyy-MM-dd")
+
+    # Non-academic weekdays: Carnival week + Easter break + Labour Day
+    _carnival   = (date_str >= lit("2023-02-20")) & (date_str <= lit("2023-02-24"))
+    _easter     = (date_str >= lit("2023-04-06")) & (date_str <= lit("2023-04-21"))
+    _labour_day = date_str == lit("2023-05-01")
+    _holiday    = _carnival | _easter | _labour_day
+
     return (
         df
         .withColumn("hour",           hour(col(ts_col)).cast("int"))
@@ -382,11 +429,9 @@ def add_time_features(df: DataFrame, ts_col: str = "timestamp") -> DataFrame:
         .withColumn("is_weekend",
             when(dayofweek(col(ts_col)).isin(1, 7), 1).otherwise(0).cast("int"))
         .withColumn("is_academic_day",
-            # Monday–Friday during dataset period (Feb–May 2023)
-            when(
-                (dayofweek(col(ts_col)).isin(1, 7) == False),
-                1
-            ).otherwise(0).cast("int"))
+            when(dayofweek(col(ts_col)).isin(1, 7), 0)  # weekend → 0
+            .when(_holiday, 0)                           # school holiday → 0
+            .otherwise(1).cast("int"))
         .withColumn("quarter_hour",
             (col("hour") * 4 + col("minute") / 15).cast("int"))
     )

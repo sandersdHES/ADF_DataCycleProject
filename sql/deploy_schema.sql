@@ -658,6 +658,14 @@ GO
 
 CREATE OR ALTER VIEW dbo.vw_prediction_accuracy
 AS
+-- One row per FullDate × ModelCode, using only the most recent prediction run.
+-- Filtering to MAX(PredictionRunDateKey) per DateKey prevents double-counting
+-- when the ML pipeline reruns on the same calendar day.
+WITH latest_run AS (
+    SELECT DateKey, MAX(PredictionRunDateKey) AS LatestRunDateKey
+    FROM dbo.fact_energy_prediction
+    GROUP BY DateKey
+)
 SELECT
   d.FullDate,
   m.ModelCode,
@@ -672,9 +680,72 @@ SELECT
   CAST(SUM(ABS(p.PredictedConsumption_Kwh - p.ActualConsumption_Kwh))
        / NULLIF(SUM(p.ActualConsumption_Kwh), 0) AS DECIMAL(10,6))        AS ConsumptionMape
 FROM dbo.fact_energy_prediction p
-JOIN dbo.dim_date             d ON d.DateKey  = p.DateKey
-JOIN dbo.dim_prediction_model m ON m.ModelKey = p.ModelKey
+JOIN dbo.dim_date             d  ON d.DateKey  = p.DateKey
+JOIN dbo.dim_prediction_model m  ON m.ModelKey = p.ModelKey
+JOIN latest_run              lr  ON lr.DateKey = p.DateKey
+                                AND lr.LatestRunDateKey = p.PredictionRunDateKey
 GROUP BY d.FullDate, m.ModelCode, m.ModelName, p.PredictionRunDateKey;
+GO
+
+-- ── Energy & Finance overlay: one row per day with actuals + predictions ───────
+-- Joins the daily energy balance with the latest-run predictions from both
+-- models so Power BI can draw "Predicted vs Actual" lines on the same axis
+-- without a ModelCode pivot step in DAX.
+CREATE OR ALTER VIEW dbo.vw_daily_energy_with_predictions
+AS
+WITH daily_prod AS (
+    SELECT DateKey, SUM(DeltaEnergy_Kwh) AS TotalProduction_Kwh
+    FROM   dbo.fact_solar_production
+    GROUP BY DateKey
+),
+daily_cons AS (
+    SELECT DateKey, SUM(DeltaEnergy_Kwh) AS TotalConsumption_Kwh
+    FROM   dbo.fact_energy_consumption
+    GROUP BY DateKey
+),
+latest_run AS (
+    SELECT DateKey, MAX(PredictionRunDateKey) AS LatestRunDateKey
+    FROM   dbo.fact_energy_prediction
+    GROUP BY DateKey
+),
+pred_prod AS (
+    SELECT p.DateKey, SUM(p.PredictedProduction_Kwh) AS PredictedProduction_Kwh
+    FROM   dbo.fact_energy_prediction p
+    JOIN   latest_run lr ON lr.DateKey = p.DateKey AND lr.LatestRunDateKey = p.PredictionRunDateKey
+    JOIN   dbo.dim_prediction_model m ON m.ModelKey = p.ModelKey AND m.ModelCode = 'PV_PROD_V1'
+    GROUP BY p.DateKey
+),
+pred_cons AS (
+    SELECT p.DateKey, SUM(p.PredictedConsumption_Kwh) AS PredictedConsumption_Kwh
+    FROM   dbo.fact_energy_prediction p
+    JOIN   latest_run lr ON lr.DateKey = p.DateKey AND lr.LatestRunDateKey = p.PredictionRunDateKey
+    JOIN   dbo.dim_prediction_model m ON m.ModelKey = p.ModelKey AND m.ModelCode = 'CONS_V1'
+    GROUP BY p.DateKey
+)
+SELECT
+    d.FullDate,
+    d.[Year],
+    d.[Month],
+    d.MonthName,
+    (d.[Year] * 100 + d.[Month])                                              AS YearMonthKey,
+    CONVERT(NCHAR(7), d.FullDate, 126)                                        AS YearMonthLabel,
+    d.IsWeekend,
+    d.IsAcademicDay,
+    -- Actuals
+    ISNULL(fp.TotalProduction_Kwh,  0)                                        AS TotalProduction_Kwh,
+    ISNULL(fc.TotalConsumption_Kwh, 0)                                        AS TotalConsumption_Kwh,
+    ISNULL(fc.TotalConsumption_Kwh, 0) - ISNULL(fp.TotalProduction_Kwh, 0)   AS NetConsumption_Kwh,
+    CASE WHEN ISNULL(fc.TotalConsumption_Kwh, 0) > 0
+         THEN ISNULL(fp.TotalProduction_Kwh, 0) / fc.TotalConsumption_Kwh
+         ELSE 0 END                                                            AS SelfSufficiencyRatio,
+    -- Predictions (NULL when ML pipeline has not yet run for the day)
+    pp.PredictedProduction_Kwh,
+    pc.PredictedConsumption_Kwh
+FROM dbo.dim_date d
+LEFT JOIN daily_prod fp ON fp.DateKey = d.DateKey
+LEFT JOIN daily_cons fc ON fc.DateKey = d.DateKey
+LEFT JOIN pred_prod  pp ON pp.DateKey = d.DateKey
+LEFT JOIN pred_cons  pc ON pc.DateKey = d.DateKey;
 GO
 
 ----------------------------------------------------------------------
