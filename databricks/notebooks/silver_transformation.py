@@ -42,21 +42,8 @@ from pyspark.sql.functions import (
     col, sha2, to_timestamp, concat_ws, when, lit, mean,
     explode, array, struct, regexp_extract, regexp_replace,
     coalesce, lag, translate, date_format,
-    input_file_name, element_at, split,
 )
 from pyspark.sql.window import Window
-
-# A handful of bronze CSV files use MM.DD.YYYY in both their filename and their
-# Date_Raw column instead of the DD.MM.YYYY convention every other day uses.
-# Without per-file format selection these would either fail to parse (Feb 16 →
-# month=16 invalid) or silently collide with real Jan 3/4/5 readings via
-# dropDuplicates(["timestamp"]).
-_MMDD_FILENAMES = {
-    "02.16.2023-Consumption.csv",
-    "03.01.2023-Consumption.csv",
-    "04.01.2023-Consumption.csv",
-    "05.01.2023-Consumption.csv",
-}
 
 logger = logging.getLogger(__name__)
 if not logger.handlers:
@@ -241,35 +228,19 @@ def _read_utf16_sensor(path: str, val_col: str, var_col: str):
 
 
 def _parse_timestamp(df):
-    """Extracts and parses timestamp from Date_Raw / Heure_Raw columns.
-
-    Files listed in _MMDD_FILENAMES use MM.DD.YYYY in their Date_Raw column
-    (matching their filename); every other file uses DD.MM.YYYY. The format
-    is selected per row from the originating filename so the four bad-format
-    files land at the correct DateKey instead of either failing to parse
-    (Feb 16) or colliding with real Jan 3/4/5 timestamps.
-    """
+    """Extracts and parses timestamp from Date_Raw / Heure_Raw columns."""
     return (
         df
-        .withColumn("_src", element_at(split(input_file_name(), "/"), -1))
         .withColumn("_d", regexp_extract(col("Date_Raw"),  r"(\d{2}\.\d{2}\.\d{2,4})", 1))
         .withColumn("_t", regexp_extract(col("Heure_Raw"), r"(\d{2}:\d{2}(?::\d{2})?)", 1))
         .withColumn(
             "timestamp",
-            when(
-                col("_src").isin(*_MMDD_FILENAMES),
-                coalesce(
-                    to_timestamp(concat_ws(" ", col("_d"), col("_t")), "MM.dd.yyyy HH:mm:ss"),
-                    to_timestamp(concat_ws(" ", col("_d"), col("_t")), "MM.dd.yyyy HH:mm"),
-                ),
-            ).otherwise(
-                coalesce(
-                    to_timestamp(concat_ws(" ", col("_d"), col("_t")), "dd.MM.yyyy HH:mm:ss"),
-                    to_timestamp(concat_ws(" ", col("_d"), col("_t")), "dd.MM.yyyy HH:mm"),
-                )
+            coalesce(
+                to_timestamp(concat_ws(" ", col("_d"), col("_t")), "dd.MM.yyyy HH:mm:ss"),
+                to_timestamp(concat_ws(" ", col("_d"), col("_t")), "dd.MM.yyyy HH:mm"),
             ),
         )
-        .drop("_d", "_t", "_src", "Date_Raw", "Heure_Raw", "Unit_Raw")
+        .drop("_d", "_t", "Date_Raw", "Heure_Raw", "Unit_Raw")
     )
 
 
