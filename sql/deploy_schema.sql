@@ -482,13 +482,13 @@ SELECT
     r.[Floor],
     r.Wing,
     r.RoomType,
-    div.SchoolName,
-    div.DivisionCode,
+    ISNULL(div.SchoolName, 'Unassigned')               AS SchoolName,
+    ISNULL(div.DivisionCode, 'Unassigned')             AS DivisionCode,
     COUNT(frb.BookingKey)                              AS BookingCount,
     ISNULL(SUM(frb.DurationMinutes), 0)                AS TotalBookedMinutes,
     -- Denominator = 600 minutes = 10h operating window (08:00–18:00).
-    -- Values > 100% indicate overlapping/double bookings on the same room.
-    ISNULL(SUM(frb.DurationMinutes), 0) * 100.0 / 600.0 AS OccupationPct,
+    -- Capped at 100 so Power BI visuals don't spike on overlapping bookings.
+    LEAST(ISNULL(SUM(frb.DurationMinutes), 0) * 100.0 / 600.0, 100.0) AS OccupationPct,
     MIN(t_start.TimeLabel)                             AS EarliestBookingTime,
     MAX(t_end.TimeLabel)                               AS LatestBookingTime
 FROM dbo.dim_date d
@@ -504,7 +504,8 @@ WHERE d.IsAcademicDay = 1
 GROUP BY d.FullDate, d.[Year], d.[Month], d.MonthName, d.WeekOfYear,
          d.DayName, d.IsWeekend, d.IsAcademicDay,
          r.RoomCode, r.[Floor], r.Wing, r.RoomType,
-         div.SchoolName, div.DivisionCode;
+         ISNULL(div.SchoolName, 'Unassigned'),
+         ISNULL(div.DivisionCode, 'Unassigned');
 GO
 
 -- Per-hour granularity for the heatmap matrix. One row per
