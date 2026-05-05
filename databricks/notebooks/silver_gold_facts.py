@@ -42,9 +42,11 @@ import logging
 from pyspark.sql.functions import (
     col, lit, year, month, hour, minute,
     to_date, try_to_date, date_format, concat_ws,
-    coalesce, when, trim, regexp_replace
+    coalesce, when, trim, regexp_replace,
+    sum as F_sum, max as F_max, lag,
 )
 from pyspark.sql import DataFrame
+from pyspark.sql.window import Window
 import datetime
 
 logger = logging.getLogger(__name__)
@@ -295,6 +297,86 @@ else:
     n = df_fact_prod.count()
     write_gold(df_fact_prod, "fact_solar_production")
     logger.info("fact_solar_production : %s rows inserted (DateKey > %d).", f"{n:,}", wm_prod)
+
+# COMMAND ----------
+
+# DBTITLE 1,Untitled
+# MAGIC %md
+# MAGIC ## 2b · `fact_solar_production` backfill from inverter data
+# MAGIC
+# MAGIC The aggregated `*-PV.csv` source ends Feb 19 2023, but the per-inverter
+# MAGIC `min*.csv` extracts cover later months. For every (DateKey, TimeKey)
+# MAGIC slot not already populated by step 2, derive aggregated production by
+# MAGIC summing per-inverter `daysum` (Wh, daily-cumulative, resets at
+# MAGIC midnight) across all inverters, taking the latest sub-reading inside
+# MAGIC each 15-min slot, and computing the slot delta within each day.
+
+# COMMAND ----------
+
+# DBTITLE 1,Untitled
+df_inv_silver_all = (
+    spark.read.parquet(f"{silver_base}/solar_inverters/")
+    .filter(col("log_timestamp").isNotNull())
+    .filter(col("daysum").isNotNull())
+    .withColumn("DateKey", ts_to_datekey(col("log_timestamp")))
+    # Floor every 5-min reading into its 15-min bucket (TimeKey = minutes-of-day,
+    # rounded down to a 15-min boundary).
+    .withColumn(
+        "TimeKey15",
+        (((hour(col("log_timestamp")) * 60 + minute(col("log_timestamp"))) / lit(15))
+            .cast("int") * lit(15)).cast("short"),
+    )
+)
+
+# daysum is monotonically non-decreasing within a day, so the max within a slot
+# is the last reading in that slot. Sum across inverters per slot and convert
+# Wh -> kWh (the source column is in Wh despite the misleading downstream name).
+df_slot_total = (
+    df_inv_silver_all
+    .groupBy("DateKey", "TimeKey15", "inverter_id")
+    .agg(F_max(col("daysum")).alias("daysum_eos"))
+    .groupBy("DateKey", "TimeKey15")
+    .agg((F_sum(col("daysum_eos")) / lit(1000.0)).alias("CumulativeDaily_Kwh"))
+)
+
+# Slot delta within the day. daysum resets at midnight, so the very first slot
+# of each day already represents that slot's production directly.
+w_day = Window.partitionBy("DateKey").orderBy("TimeKey15")
+df_prod_from_inv = (
+    df_slot_total
+    .withColumn("_prev", lag("CumulativeDaily_Kwh", 1).over(w_day))
+    .withColumn(
+        "DeltaEnergy_Kwh",
+        when(col("_prev").isNull(), col("CumulativeDaily_Kwh"))
+        .when(col("CumulativeDaily_Kwh") < col("_prev"), lit(None).cast("double"))
+        .otherwise(col("CumulativeDaily_Kwh") - col("_prev")),
+    )
+    .withColumnRenamed("TimeKey15", "TimeKey")
+    # No equivalent of the *-PV.csv lifetime cumulative — leave NULL.
+    .withColumn("CumulativeEnergy_Kwh", lit(None).cast("double"))
+    .withColumn("Year",  (col("DateKey") / lit(10000)).cast("short"))
+    .withColumn("Month", ((col("DateKey") / lit(100)) % lit(100)).cast("byte"))
+    .select("DateKey", "TimeKey", "CumulativeEnergy_Kwh", "DeltaEnergy_Kwh", "Year", "Month")
+    .filter(col("DeltaEnergy_Kwh").isNotNull())
+    .dropDuplicates(["DateKey", "TimeKey"])
+)
+
+# Skip slots already covered by the *-PV.csv source.
+existing_prod_slots = spark.read.jdbc(
+    url=jdbc_url,
+    table="(SELECT DateKey, TimeKey FROM dbo.fact_solar_production) t",
+    properties=jdbc_props,
+)
+df_prod_backfill = df_prod_from_inv.join(
+    existing_prod_slots, ["DateKey", "TimeKey"], "left_anti"
+)
+
+backfill_n = df_prod_backfill.count()
+if backfill_n > 0:
+    write_gold(df_prod_backfill, "fact_solar_production")
+    logger.info("fact_solar_production : %s rows backfilled from inverter data.", f"{backfill_n:,}")
+else:
+    logger.info("fact_solar_production : nothing to backfill from inverter data.")
 
 # COMMAND ----------
 
