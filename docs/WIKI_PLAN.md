@@ -128,6 +128,8 @@ Summary table (copy from §3 intro):
 
 Then one subsection per source (§3.1–§3.7) with the full column tables, encoding quirks, counter-reset / GDPR / Sierre-synthesis notes — copy verbatim from the technical guide.
 
+Also include the **xx:00-absence callouts** present in §3.2–§3.5 (Vetroz aggregator emits 72 readings/day at +15/+30/+45 only; silver synthesises the xx:00 row by linear interpolation), the **`*-PV.csv` coverage range** (2023-01-01 → 2023-02-19; later dates are backfilled from inverter `Pac` integration), and the **bronze data gaps** for 2023-02-16, 2023-03-01, 2023-04-01, 2023-05-01.
+
 ---
 
 ### ADF Pipelines — Pipeline Catalog (`ADF-Pipelines.md`)
@@ -170,9 +172,9 @@ Overview table:
 | `sac_export_to_adls.py` | `PL_SAC_Export` | SQL Gold views | `sacexport/sac_inverter_combined.csv` |
 
 Then one section per notebook — copy from §5.1–§5.6, including:
-- §5.1: UTF-16 handling, solar wide→long unpivot (55-column → 1 row/inverter), counter-reset null logic, GDPR SHA-256, Sierre synthesis, **and the full silver table schemas** (all 8 tables with column-level detail)
+- §5.1: UTF-16 handling, solar wide→long unpivot (55-column → 1 row/inverter), counter-reset null logic, **xx:00 synthesis via `_synthesize_xx00_rows` (96-slot/day cadence for the four Vetroz sensor families)**, GDPR SHA-256, Sierre synthesis, **and the full silver table schemas** (all 8 tables with column-level detail — note that `solar_aggregated`, `consumption`, `temperature`, `humidity` carry synthesised xx:00 rows)
 - §5.2: LEFT ANTI JOIN idempotency, SCD2 for `ref_electricity_tariff`, sentinel `StatusCode=99`
-- §5.3: watermark pattern, grain per fact table, FULL OUTER JOIN for `fact_environment`
+- §5.3: watermark pattern, grain per fact table, FULL OUTER JOIN for `fact_environment`, **`fact_solar_inverter.DayEnergy_Kwh` Wh→kWh conversion (`/1000`)**, **`fact_solar_production` two-pass load: pass 2 from `*-PV.csv` (Jan 1–Feb 19 2023) + pass 2b backfilled from inverter `Pac` integration (Feb 20+ — `Σ Pac_W / 12000` per 15-min slot, LEFT ANTI JOIN against existing slots)**
 - §5.4: feature sets for solar and consumption, 3h→15min forward-fill, room occupation computation
 - §5.5: DELETE-before-INSERT idempotency, `sp_backfill_prediction_actuals`
 - §5.6: Gold views → single coalesced CSV → File Share
@@ -215,7 +217,7 @@ Then one section per notebook — copy from §5.1–§5.6, including:
 **Analytical views** — copy the full §6.3 per-view sections, including column tables and formulas for all seven views:
 - `vw_inverter_status_breakdown`: `PctOfDayReadings` window formula
 - `vw_inverter_performance`: `PerformanceRatio = SUM(AcPower_W) / (RatedPower_kWp × 1000 × COUNT(*))`
-- `vw_daily_energy_balance`: `SelfSufficiencyRatio`, `NetConsumption_Kwh`
+- `vw_daily_energy_balance`: `SelfSufficiencyRatio`, `NetConsumption_Kwh`. **Pre-aggregates each fact to day grain in a CTE before joining on `DateKey`** to avoid a many-to-many fan-out (96 prod × 96 cons rows per day) that would inflate totals.
 - `vw_building_occupation`: `OccupationPct = TotalBookedMinutes / 600 × 100` (denominator = 10h operating window, 08:00–18:00) — daily granularity
 - `vw_building_occupation_hourly`: per-(date,room,hour) granularity. `OccupationPct = BookedMinutesInHour / 60 × 100` from precise [start,end) overlap with each hour bucket
 - `vw_kpi_dashboard_home`: five KPI card columns
@@ -311,6 +313,10 @@ Then one section per notebook — copy from §5.1–§5.6, including:
 - SQL schema change (manual `sqlcmd` with `deploy_schema.sql` then `deploy_security.sql`)
 - New user provisioning (run `sql/provision_user.sql` — link to Security page)
 - Tariff change (three places must stay in sync)
+- **Re-run xx:00 synthesis** — re-run silver, then `sql/refresh_xx00_synthesis.sql` (truncates 3 fact tables), then `silver_gold_facts.py`. Truncation is required because the gold loader is watermark-based.
+- **Re-run inverter Pac backfill** (step 2b) — `sql/refresh_production_backfill.sql` deletes only the inverter-derived rows (`CumulativeEnergy_Kwh IS NULL`) without touching the `*-PV.csv`-derived rows.
+- **Phantom rows in fact tables** — one-shot `sql/cleanup_phantom_facts.sql`, idempotent.
+- **Migrate legacy `DayEnergy_Kwh` from Wh to kWh** — `sql/migrate_dayenergy_to_kwh.sql`, run once only (not idempotent).
 
 ---
 
@@ -401,6 +407,9 @@ Copy the full §12 list (updated), including:
 - Booking column rename is positional — silent failure if CSV column order changes
 - Tariff triplicated — SQL computed columns, JSON config, SCD2 table
 - No lineage in Gold (no `LoadBatchId` / `IngestedAt`)
+- **Bronze data gaps** — 2023-02-16, 2023-03-01, 2023-04-01, 2023-05-01 absent from the source for both consumption and production. Side effect: each next-day's 00:15 row carries a 30-hour delta.
+- **xx:00 synthesis is interpolated, not measured** — `silver_transformation.py._synthesize_xx00_rows` injects a linearly-interpolated row at every xx:00. Daily/hourly aggregates are unaffected (energy is conserved); intra-hour visualisations now show 96 slots instead of 72. Models trained on the pre-synthesis 72-slot pattern should be retrained.
+- **`*-PV.csv` source ends 2023-02-19** — production from 2023-02-20 onwards is backfilled from inverter `Pac` integration (5-min telemetry × all five inverters → 15-min buckets). Both eras share the same `fact_solar_production` schema; only the legacy era has `CumulativeEnergy_Kwh` populated.
 - Fixed ML training window 2023-02-20 → 2023-04-19
 - `publish_config.json` is legacy
 
