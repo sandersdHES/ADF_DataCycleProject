@@ -424,6 +424,22 @@ GO
 
 CREATE OR ALTER VIEW dbo.vw_daily_energy_balance
 AS
+-- Pre-aggregate each fact to one row per DateKey before joining dim_date.
+-- The original direct LEFT JOIN on DateKey only caused a many-to-many cross
+-- product (N production slots × M consumption slots per date), inflating both
+-- sums by the row count of the opposite table.
+WITH daily_prod AS (
+    SELECT DateKey,
+           SUM(DeltaEnergy_Kwh) AS TotalProduction_Kwh
+    FROM dbo.fact_solar_production
+    GROUP BY DateKey
+),
+daily_cons AS (
+    SELECT DateKey,
+           SUM(DeltaEnergy_Kwh) AS TotalConsumption_Kwh
+    FROM dbo.fact_energy_consumption
+    GROUP BY DateKey
+)
 SELECT
     d.FullDate,
     d.[Year],
@@ -432,25 +448,23 @@ SELECT
     -- Sort keys for Power BI: month/year axes ordered chronologically rather
     -- than by raw integer (which causes the "5,6,7,8,9" mislabel when the
     -- model treats Month as a free-standing dimension).
-    (d.[Year] * 100 + d.[Month])                                           AS YearMonthKey,
-    CONVERT(NCHAR(7), d.FullDate, 126)                                     AS YearMonthLabel,
+    (d.[Year] * 100 + d.[Month])                                              AS YearMonthKey,
+    CONVERT(NCHAR(7), d.FullDate, 126)                                        AS YearMonthLabel,
     d.Quarter,
     d.IsWeekend,
     d.IsAcademicDay,
     d.Season,
-    ISNULL(SUM(fp.DeltaEnergy_Kwh), 0)                                     AS TotalProduction_Kwh,
-    ISNULL(SUM(fc.DeltaEnergy_Kwh), 0)                                     AS TotalConsumption_Kwh,
-    ISNULL(SUM(fc.DeltaEnergy_Kwh), 0) - ISNULL(SUM(fp.DeltaEnergy_Kwh), 0) AS NetConsumption_Kwh,
-    ISNULL(SUM(fc.DeltaEnergy_Kwh), 0) * 0.1500                            AS TotalCost_CHF,
-    ISNULL(SUM(fp.DeltaEnergy_Kwh), 0) * 0.1500                            AS TotalProductionValue_CHF,
-    CASE WHEN ISNULL(SUM(fc.DeltaEnergy_Kwh), 0) > 0
-         THEN ISNULL(SUM(fp.DeltaEnergy_Kwh), 0) / ISNULL(SUM(fc.DeltaEnergy_Kwh), 0)
-         ELSE 0 END                                                         AS SelfSufficiencyRatio
+    ISNULL(fp.TotalProduction_Kwh, 0)                                         AS TotalProduction_Kwh,
+    ISNULL(fc.TotalConsumption_Kwh, 0)                                        AS TotalConsumption_Kwh,
+    ISNULL(fc.TotalConsumption_Kwh, 0) - ISNULL(fp.TotalProduction_Kwh, 0)   AS NetConsumption_Kwh,
+    ISNULL(fc.TotalConsumption_Kwh, 0) * 0.1500                               AS TotalCost_CHF,
+    ISNULL(fp.TotalProduction_Kwh, 0)  * 0.1500                               AS TotalProductionValue_CHF,
+    CASE WHEN ISNULL(fc.TotalConsumption_Kwh, 0) > 0
+         THEN ISNULL(fp.TotalProduction_Kwh, 0) / fc.TotalConsumption_Kwh
+         ELSE 0 END                                                            AS SelfSufficiencyRatio
 FROM dbo.dim_date d
-LEFT JOIN dbo.fact_solar_production   fp ON fp.DateKey = d.DateKey
-LEFT JOIN dbo.fact_energy_consumption fc ON fc.DateKey = d.DateKey
-GROUP BY d.FullDate, d.[Year], d.[Month], d.MonthName, d.Quarter,
-         d.IsWeekend, d.IsAcademicDay, d.Season;
+LEFT JOIN daily_prod fp ON fp.DateKey = d.DateKey
+LEFT JOIN daily_cons fc ON fc.DateKey = d.DateKey;
 GO
 
 CREATE OR ALTER VIEW dbo.vw_building_occupation
