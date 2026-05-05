@@ -66,10 +66,9 @@ The difference between production and consumption (Production minus Consumption)
 
 ### Cost Avoided · *dark green border*
 
-The amount of money saved in CHF because solar energy was used directly instead of purchasing from the grid. Calculated as `Production × tariff rate (0.25 CHF/kWh)` from `ref_electricity_tariff`.
+The amount of money saved in CHF because solar energy was used directly instead of purchasing from the grid. Calculated as `Production × tariff rate (CHF/kWh)`. The tariff rate is defined as a constant inside the DAX measure.
 
 - **Measure:** `Cost Avoided CHF` (from `_Measures → Home KPI`)
-- **Tariff reference:** `ref_electricity_tariff → PricePerKwh_CHF`
 
 ### Net Financial Impact · *orange border*
 
@@ -112,7 +111,7 @@ The bar chart on the left side of the dashboard compares solar energy production
 
 ## 4. CHF Financial Breakdown
 
-The donut chart on the right side of the dashboard splits the financial picture into three segments to show where money was saved and where it was spent during the selected period.
+The donut chart on the right side of the dashboard splits the financial picture into two segments to show where money was saved and where it was spent during the selected period. Hovering over a segment reveals the electricity tariff rate used in calculations.
 
 ![CHF Financial Breakdown donut chart](assets/energy-financial/chf-financial-breakdown.png)
 
@@ -122,7 +121,8 @@ The donut chart on the right side of the dashboard splits the financial picture 
 |---|---|---|
 | 🟢 Green | **Savings** — CHF value of solar energy used directly instead of purchased from the grid | `Cost Saved on Production CHF` (from `_Measures → Energy & Financial`) |
 | 🔴 Red | **Grid cost** — Amount spent purchasing energy from the grid during the period | `Grid Purchase Cost CHF` (from `_Measures → Energy & Financial`) |
-| 🟠 Orange | **Tariff reference** — Reference electricity rate used in calculations (0.25 CHF/kWh) | `Tariff CHF per kWh` (from `_Measures → Shared / Global`) |
+
+> **Tooltip:** Hovering over either segment also shows `Tariff CHF per kWh` (from `_Measures → Shared / Global`) — the electricity rate used in both calculations.
 
 ### How to interpret it
 
@@ -130,16 +130,19 @@ In an ideal scenario, the **green segment (Savings)** should be the largest, mea
 
 ---
 
-## 5. Consumption Pattern by Time of Day
+## 5. Energy Pattern by Time of Day
 
-The area chart at the bottom right shows how energy consumption is distributed across the hours of the day. The X-axis represents the hour (0 to 21) and the Y-axis shows energy in kWh. This chart is **not affected by the Date Range filter** — it shows an aggregate across all available data.
+The area chart at the bottom left shows how both energy consumption and solar production are distributed across the hours of the day. The X-axis represents the hour (0 to 23) and the Y-axis shows energy in kWh. This chart is **not affected by the Date Range filter** — it shows an aggregate across all available data.
 
 ![Consumption by Time of Day area chart](assets/energy-financial/consumption-by-hour.png)
 
 ### Data sources
 
-- **X-axis:** `Hour` from `dim_time`
-- **Y-axis:** `DeltaEnergy_Kwh` from `fact_energy_consumption`
+| Series | Data |
+|---|---|
+| Consumption | `DeltaEnergy_Kwh` from `fact_energy_consumption` |
+| Production | `DeltaEnergy_Kwh` from `fact_solar_production` |
+| X-axis | `Hour` from `dim_time` |
 
 ### How to read it
 
@@ -149,10 +152,26 @@ The area chart at the bottom right shows how energy consumption is distributed a
 | Peak around 9–10h | Busiest hours of operation |
 | Gradual decrease afternoon | Reduced activity through the day |
 | Near-zero from 0h–5h | Building mostly inactive at night |
+| Production peak mid-day | Solar generation peaks when irradiance is highest (typically 10h–14h) |
 
 ### Operational insight
 
-If the peak shifts to an unusual hour or a secondary spike appears mid-day, this may indicate equipment running outside normal schedules or an automated system activating unexpectedly. Cross-reference with the bar chart and the Date Range filter to identify the specific day.
+If the consumption peak shifts to an unusual hour or a secondary spike appears mid-day, this may indicate equipment running outside normal schedules or an automated system activating unexpectedly. Cross-reference with the bar chart and the Date Range filter to identify the specific day.
+
+---
+
+## 6. ML Prediction Comparison
+
+Two additional card visuals at the bottom right compare the ML model's forecasts against actual measured values for the selected period. These cards allow you to quickly gauge how accurate the daily predictions were.
+
+| Card | Measure | What it shows |
+|---|---|---|
+| **Actual Consumption kWh** | `Actual Consumption kWh` (from `_Measures`) | Total consumption recorded by the meter |
+| **Predicted Consumption kWh** | `Predicted Consumption kWh` (from `_Measures`) | KNIME GBT model's forecasted consumption |
+| **Actual Production kWh** | `Actual Production kWh` (from `_Measures`) | Total solar production recorded by inverters |
+| **Predicted Production kWh** | `Predicted Production kWh` (from `_Measures`) | KNIME GBT model's forecasted production |
+
+> **Note:** These cards draw from the `fact_energy_prediction` table, which is populated by the ML pipeline. If no prediction run exists for the selected date range, the cards will be blank.
 
 ---
 
