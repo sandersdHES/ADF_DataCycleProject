@@ -125,7 +125,8 @@ GRANT SELECT ON [dbo].[fact_environment]        TO [Director_Role];
 GRANT SELECT ON [dbo].[fact_weather_forecast]   TO [Director_Role];
 GRANT SELECT ON [dbo].[fact_room_booking]       TO [Director_Role];
 GRANT SELECT ON [dbo].[vw_daily_energy_balance] TO [Director_Role];
-GRANT SELECT ON [dbo].[vw_building_occupation]  TO [Director_Role];
+GRANT SELECT ON [dbo].[vw_building_occupation]         TO [Director_Role];
+GRANT SELECT ON [dbo].[vw_building_occupation_hourly]  TO [Director_Role];
 GRANT SELECT ON [dbo].[vw_kpi_dashboard_home]   TO [Director_Role];
 GO
 
@@ -174,6 +175,7 @@ GRANT SELECT ON [dbo].[fact_energy_consumption] TO [Teacher_Role];
 GRANT SELECT ON [dbo].[fact_environment]        TO [Teacher_Role];
 GRANT SELECT ON [dbo].[fact_room_booking]       TO [Teacher_Role];
 GRANT SELECT ON [dbo].[vw_daily_energy_balance] TO [Teacher_Role];
-GRANT SELECT ON [dbo].[vw_building_occupation]  TO [Teacher_Role];
+GRANT SELECT ON [dbo].[vw_building_occupation]         TO [Teacher_Role];
+GRANT SELECT ON [dbo].[vw_building_occupation_hourly]  TO [Teacher_Role];
 GRANT SELECT ON [dbo].[vw_kpi_dashboard_home]   TO [Teacher_Role];
 GO

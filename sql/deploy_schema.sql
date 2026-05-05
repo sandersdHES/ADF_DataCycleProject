@@ -472,7 +472,9 @@ SELECT
     div.DivisionCode,
     COUNT(frb.BookingKey)                              AS BookingCount,
     ISNULL(SUM(frb.DurationMinutes), 0)                AS TotalBookedMinutes,
-    ISNULL(SUM(frb.DurationMinutes), 0) * 100.0 / 720.0 AS OccupationPct,
+    -- Denominator = 600 minutes = 10h operating window (08:00–18:00).
+    -- Values > 100% indicate overlapping/double bookings on the same room.
+    ISNULL(SUM(frb.DurationMinutes), 0) * 100.0 / 600.0 AS OccupationPct,
     MIN(t_start.TimeLabel)                             AS EarliestBookingTime,
     MAX(t_end.TimeLabel)                               AS LatestBookingTime
 FROM dbo.dim_date d
@@ -487,6 +489,69 @@ GROUP BY d.FullDate, d.[Year], d.[Month], d.MonthName, d.WeekOfYear,
          d.DayName, d.IsWeekend, d.IsAcademicDay,
          r.RoomCode, r.[Floor], r.Wing, r.RoomType,
          div.SchoolName, div.DivisionCode;
+GO
+
+-- Per-hour granularity for the heatmap matrix. One row per
+-- (academic date, room, hour 0..23). OccupationPct = % of that hour
+-- the room was booked, computed from the precise overlap between
+-- each booking's [StartTimeKey, EndTimeKey) interval and the hour
+-- bucket [h*60, (h+1)*60).
+CREATE OR ALTER VIEW dbo.vw_building_occupation_hourly
+AS
+WITH hours(HourOfDay) AS (
+    SELECT v
+    FROM (VALUES (0),(1),(2),(3),(4),(5),(6),(7),(8),(9),(10),(11),
+                 (12),(13),(14),(15),(16),(17),(18),(19),(20),(21),(22),(23)) AS h(v)
+),
+booking_hour_overlap AS (
+    SELECT
+        frb.BookingKey,
+        frb.DateKey,
+        frb.RoomKey,
+        frb.DivisionKey,
+        h.HourOfDay,
+        CASE WHEN frb.EndTimeKey   < (h.HourOfDay + 1) * 60
+             THEN frb.EndTimeKey   ELSE (h.HourOfDay + 1) * 60 END
+      - CASE WHEN frb.StartTimeKey > h.HourOfDay * 60
+             THEN frb.StartTimeKey ELSE h.HourOfDay * 60 END
+            AS BookedMinutesInHour
+    FROM dbo.fact_room_booking frb
+    CROSS JOIN hours h
+    WHERE frb.StartTimeKey < (h.HourOfDay + 1) * 60
+      AND frb.EndTimeKey   > h.HourOfDay * 60
+)
+SELECT
+    d.FullDate,
+    d.[Year],
+    d.[Month],
+    d.MonthName,
+    d.WeekOfYear,
+    d.DayName,
+    d.IsWeekend,
+    d.IsAcademicDay,
+    r.RoomCode,
+    r.[Floor],
+    r.Wing,
+    r.RoomType,
+    div.SchoolName,
+    div.DivisionCode,
+    h.HourOfDay,
+    ISNULL(SUM(bho.BookedMinutesInHour), 0)                 AS BookedMinutesInHour,
+    ISNULL(SUM(bho.BookedMinutesInHour), 0) * 100.0 / 60.0  AS OccupationPct
+FROM dbo.dim_date d
+CROSS JOIN dbo.dim_room r
+CROSS JOIN hours h
+LEFT JOIN booking_hour_overlap bho
+       ON bho.DateKey   = d.DateKey
+      AND bho.RoomKey   = r.RoomKey
+      AND bho.HourOfDay = h.HourOfDay
+LEFT JOIN dbo.dim_division div
+       ON div.DivisionKey = bho.DivisionKey
+WHERE d.IsAcademicDay = 1
+GROUP BY d.FullDate, d.[Year], d.[Month], d.MonthName, d.WeekOfYear,
+         d.DayName, d.IsWeekend, d.IsAcademicDay,
+         r.RoomCode, r.[Floor], r.Wing, r.RoomType,
+         div.SchoolName, div.DivisionCode, h.HourOfDay;
 GO
 
 CREATE OR ALTER VIEW dbo.vw_kpi_dashboard_home

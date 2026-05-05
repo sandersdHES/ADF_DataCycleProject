@@ -49,7 +49,7 @@ Right below the filters, three large colored cards give you the most important n
 
 ![Room Occupancy heatmap by hour](assets/room-occupancy/room-occupancy-by-hour.png)
 
-> **Technical Setup:** Built using a Matrix visual. Rows contain `RoomCode`, columns map to hours of the day (0–23), and conditional formatting is applied to background values.
+> **Technical Setup:** Built using a Matrix visual bound to `vw_building_occupation_hourly`. Rows contain `RoomCode`, columns map to `HourOfDay` (0–23), and conditional formatting is applied to the per-hour `OccupationPct` (booked-minutes-in-hour ÷ 60 × 100). All other dashboard visuals use the daily `vw_building_occupation` view.
 
 This detailed table uses colour intensity to show you your daily schedule at a glance.
 
