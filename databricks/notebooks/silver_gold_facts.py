@@ -229,7 +229,9 @@ else:
         # Measures — BUG C FIXED: read the real Silver columns
         # (BUG A in silver_transformation.py added these columns to the unpivot).
         .withColumn("AcPower_W",     col("ac_power_w").cast("double"))
-        .withColumn("DayEnergy_Kwh", col("daysum").cast("double"))
+        # `daysum` from the inverter CSV is in watt-hours; convert to kWh so
+        # the column name matches the stored unit.
+        .withColumn("DayEnergy_Kwh", col("daysum").cast("double") / lit(1000.0))
         .withColumn("DcPower1_W",    col("pdc1").cast("double"))
         .withColumn("DcPower2_W",    col("pdc2").cast("double"))
         .withColumn("DcVoltage1_V",  col("udc1").cast("double"))
@@ -307,9 +309,20 @@ else:
 # MAGIC The aggregated `*-PV.csv` source ends Feb 19 2023, but the per-inverter
 # MAGIC `min*.csv` extracts cover later months. For every (DateKey, TimeKey)
 # MAGIC slot not already populated by step 2, derive aggregated production by
-# MAGIC summing per-inverter `daysum` (Wh, daily-cumulative, resets at
-# MAGIC midnight) across all inverters, taking the latest sub-reading inside
-# MAGIC each 15-min slot, and computing the slot delta within each day.
+# MAGIC integrating instantaneous `Pac` (W) over time across all inverters,
+# MAGIC then summing into 15-min buckets.
+# MAGIC
+# MAGIC Why `Pac` rather than `daysum`: some inverters (e.g. inverter 3 in the
+# MAGIC sample data) have a stuck daily counter even when they are physically
+# MAGIC generating, so a daysum-based aggregate silently drops their output.
+# MAGIC `Pac` is the live AC-power telemetry and is recorded correctly even
+# MAGIC when the cumulative counter is broken.
+# MAGIC
+# MAGIC Each 5-min reading at `Pac` watts represents 5 minutes of power, so
+# MAGIC its energy contribution is `Pac × (5/60 h) / (1000 W/kW) = Pac/12000`
+# MAGIC kWh. Summing across all 5-min readings × all inverters within a 15-min
+# MAGIC slot gives the slot's total kWh. Zero-production slots (night, offline
+# MAGIC inverters) are kept so the dashboard's daily curve has full coverage.
 
 # COMMAND ----------
 
@@ -317,47 +330,34 @@ else:
 df_inv_silver_all = (
     spark.read.parquet(f"{silver_base}/solar_inverters/")
     .filter(col("log_timestamp").isNotNull())
-    .filter(col("daysum").isNotNull())
+)
+
+# Floor every 5-min reading into its 15-min bucket.
+df_inv_slotted = (
+    df_inv_silver_all
     .withColumn("DateKey", ts_to_datekey(col("log_timestamp")))
-    # Floor every 5-min reading into its 15-min bucket (TimeKey = minutes-of-day,
-    # rounded down to a 15-min boundary).
     .withColumn(
         "TimeKey15",
         (((hour(col("log_timestamp")) * 60 + minute(col("log_timestamp"))) / lit(15))
             .cast("int") * lit(15)).cast("short"),
     )
+    # Treat missing telemetry as zero so a transient gap on one inverter
+    # doesn't NULL out the whole slot's sum (Spark sum() ignores NULLs).
+    .withColumn("ac_power_w", coalesce(col("ac_power_w").cast("double"), lit(0.0)))
 )
 
-# daysum is monotonically non-decreasing within a day, so the max within a slot
-# is the last reading in that slot. Sum across inverters per slot and convert
-# Wh -> kWh (the source column is in Wh despite the misleading downstream name).
-df_slot_total = (
-    df_inv_silver_all
-    .groupBy("DateKey", "TimeKey15", "inverter_id")
-    .agg(F_max(col("daysum")).alias("daysum_eos"))
-    .groupBy("DateKey", "TimeKey15")
-    .agg((F_sum(col("daysum_eos")) / lit(1000.0)).alias("CumulativeDaily_Kwh"))
-)
-
-# Slot delta within the day. daysum resets at midnight, so the very first slot
-# of each day already represents that slot's production directly.
-w_day = Window.partitionBy("DateKey").orderBy("TimeKey15")
+# Energy per 15-min slot = Σ(Pac_W) / 12000, where the sum runs across all
+# 5-min readings × all inverters in the slot. Constant 12000 = 1000 W/kW × 12
+# 5-min readings per hour.
 df_prod_from_inv = (
-    df_slot_total
-    .withColumn("_prev", lag("CumulativeDaily_Kwh", 1).over(w_day))
-    .withColumn(
-        "DeltaEnergy_Kwh",
-        when(col("_prev").isNull(), col("CumulativeDaily_Kwh"))
-        .when(col("CumulativeDaily_Kwh") < col("_prev"), lit(None).cast("double"))
-        .otherwise(col("CumulativeDaily_Kwh") - col("_prev")),
-    )
+    df_inv_slotted
+    .groupBy("DateKey", "TimeKey15")
+    .agg((F_sum(col("ac_power_w")) / lit(12000.0)).alias("DeltaEnergy_Kwh"))
     .withColumnRenamed("TimeKey15", "TimeKey")
-    # No equivalent of the *-PV.csv lifetime cumulative — leave NULL.
     .withColumn("CumulativeEnergy_Kwh", lit(None).cast("double"))
     .withColumn("Year",  (col("DateKey") / lit(10000)).cast("short"))
     .withColumn("Month", ((col("DateKey") / lit(100)) % lit(100)).cast("byte"))
     .select("DateKey", "TimeKey", "CumulativeEnergy_Kwh", "DeltaEnergy_Kwh", "Year", "Month")
-    .filter(col("DeltaEnergy_Kwh").isNotNull())
     .dropDuplicates(["DateKey", "TimeKey"])
 )
 
@@ -374,7 +374,7 @@ df_prod_backfill = df_prod_from_inv.join(
 backfill_n = df_prod_backfill.count()
 if backfill_n > 0:
     write_gold(df_prod_backfill, "fact_solar_production")
-    logger.info("fact_solar_production : %s rows backfilled from inverter data.", f"{backfill_n:,}")
+    logger.info("fact_solar_production : %s rows backfilled from inverter Pac integration.", f"{backfill_n:,}")
 else:
     logger.info("fact_solar_production : nothing to backfill from inverter data.")
 
