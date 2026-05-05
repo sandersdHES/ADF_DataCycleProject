@@ -216,7 +216,7 @@ Then one section per notebook — copy from §5.1–§5.6, including:
 - `vw_inverter_status_breakdown`: `PctOfDayReadings` window formula
 - `vw_inverter_performance`: `PerformanceRatio = SUM(AcPower_W) / (RatedPower_kWp × 1000 × COUNT(*))`
 - `vw_daily_energy_balance`: `SelfSufficiencyRatio`, `NetConsumption_Kwh`
-- `vw_building_occupation`: `OccupationPct = TotalBookedMinutes / 720 × 100`
+- `vw_building_occupation`: `OccupationPct = TotalBookedMinutes / 600 × 100` (denominator = 10h operating window, 08:00–18:00)
 - `vw_kpi_dashboard_home`: five KPI card columns
 - `vw_weather_vs_production`: `PredictionHorizon = 0` only; Irradiance + ForecastTemp from weather facts
 - `vw_prediction_accuracy`: MAPE = `SUM(|Predicted − Actual|) / SUM(Actual)`

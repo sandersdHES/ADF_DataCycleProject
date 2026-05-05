@@ -467,7 +467,9 @@ SELECT
     div.DivisionCode,
     COUNT(frb.BookingKey)                              AS BookingCount,
     ISNULL(SUM(frb.DurationMinutes), 0)                AS TotalBookedMinutes,
-    ISNULL(SUM(frb.DurationMinutes), 0) * 100.0 / 720.0 AS OccupationPct,
+    -- Denominator = 600 minutes = 10h operating window (08:00–18:00).
+    -- Values > 100% indicate overlapping/double bookings on the same room.
+    ISNULL(SUM(frb.DurationMinutes), 0) * 100.0 / 600.0 AS OccupationPct,
     MIN(t_start.TimeLabel)                             AS EarliestBookingTime,
     MAX(t_end.TimeLabel)                               AS LatestBookingTime
 FROM dbo.dim_date d
