@@ -7,7 +7,7 @@ Analytics Cloud and Power BI.
 
 > **Interactive diagram** — [View live architecture](https://sandersdHES.github.io/ADF_DataCycleProject/bellevue_architecture.html)
 >
-> **GitHub Pages setup (one-time):** Go to **Settings → Pages → Source**, choose **Deploy from a branch**, select branch `main` and folder `/docs`, then click **Save**. The diagram will be live at the URL above within ~1 minute.
+> **GitHub Pages setup (one-time):** Go to **Settings → Pages → Source**, select **GitHub Actions**, then click **Save**. The `deploy-pages.yml` workflow will deploy the `docs/` folder automatically on every push to `main`.
 >
 > *The HTML file is at `docs/bellevue_architecture.html`. GitHub renders `.html` files as raw source in the repository view — GitHub Pages is the only way to run it as a live interactive page.*
 
