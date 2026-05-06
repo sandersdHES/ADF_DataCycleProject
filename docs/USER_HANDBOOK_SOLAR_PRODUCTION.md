@@ -11,11 +11,15 @@ This manual provides a detailed guide on how to navigate and interpret the **Sol
 
 The dashboard draws exclusively from `fact_solar_inverter` (5-minute inverter telemetry) joined with `dim_inverter`, `dim_inverter_status`, `dim_time`, and `dim_date`.
 
+![alt text](assets/solar_production/dashboard.png)
+
 ---
 
 ## 1. Data Controls & Navigation
 
 The left-hand panel contains the primary tools for filtering the dashboard view.
+
+![Filters](assets/solar_production/filter.png)
 
 ### Time Frame Selector
 
@@ -35,7 +39,11 @@ Individual toggle buttons for units `INV-01` through `INV-05`, mapped to `Invert
 
 ## 2. Production & Environmental Correlation
 
-The primary chart at the top overlays two time series: **daily energy output** and **ambient temperature**. Both series are aggregated per time slot using the measures below.
+The primary chart at the top overlays two time series: **daily energy output** and **ambient temperature**.
+
+![Production & Environmental Correlation](assets/solar_production/prodenv.png)
+
+Both series are aggregated per time slot using the measures below.
 
 | Series | Measure | Source |
 |---|---|---|
@@ -49,7 +57,9 @@ The primary chart at the top overlays two time series: **daily energy output** a
 
 ## 3. Historical Production Rankings (Top Days)
 
-The **Top Days** bar chart highlights the highest-producing intervals in the selected period. Each bar is split by inverter colour so you can see each unit's contribution at a glance.
+The **Top Days** charts highlight the highest-producing intervals in the selected period. Each line is split by inverter colour so you can see each unit's contribution at a glance.
+
+![Top Days Dashboard](assets/solar_production/topdays.png)
 
 | Element | Data |
 |---|---|
@@ -64,6 +74,8 @@ The **Top Days** bar chart highlights the highest-producing intervals in the sel
 ## 4. Operational Log & Incident Tracking
 
 The table at the bottom provides a granular record of every 5-minute sensor reading in the selected period. Each row is colour-coded by operating status.
+
+![alt text](assets/solar_production/tracking.png)
 
 | Column | Source | Meaning |
 |---|---|---|
@@ -85,13 +97,8 @@ Each red entry identifies the exact timestamp and inverter name associated with 
 
 The bottom-right section compares actual output against the inverters' rated capacity using the `Production vs Rated Pct` measure. This is computed as actual AC power divided by the sum of rated peak power (`dim_inverter.RatedPower_kWp`) across the selected units.
 
-### Traffic Light System
+![Inverters](assets/solar_production/inverters.png)
 
-| Indicator | Threshold | Status |
-|---|---|---|
-| 🟢 Green | > 85 % | Optimal — inverters are operating close to rated capacity |
-| 🟠 Orange | 75 – 85 % | Acceptable — minor performance loss, monitor closely |
-| 🔴 Red | < 75 % | Inspection needed — significant underperformance detected |
 
 ---
 

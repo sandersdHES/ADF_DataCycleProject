@@ -14,7 +14,9 @@ The **Bellevue – Solar Panel Overview** dashboard provides real-time visibilit
 - **Technicians** — Daily monitoring, fault diagnosis, and maintenance planning.
 - **Directors** — High-level performance review and reporting.
 
-The dashboard draws from sensor readings captured every 5 minutes (288 readings per inverter per day) and is refreshed automatically each morning by ~07:30 after the data pipeline completes.
+The dashboard draws from sensor readings captured every 5 minutes (288 readings per inverter per day) and can be refreshed with new data each morning from ~07:30 after the data pipeline completes.
+
+![Dashboard](assets/SAC/dashboard.png)
 
 ---
 
@@ -23,7 +25,7 @@ The dashboard draws from sensor readings captured every 5 minutes (288 readings 
 The dashboard is hosted on **SAP Analytics Cloud (SAC)**. To access it:
 
 1. Open your browser and go to your organisation's SAC URL.
-2. Log in with your **HES-SO credentials** (same username and password as your other institutional tools).
+2. Log in with your **HES-SO credentials** (same username as given during the project - Password AdminHevs01).
 3. In the left navigation panel, click **Stories**.
 4. Open the story named **Bellevue – Solar Panel Overview**.
 
@@ -34,6 +36,8 @@ The dashboard is hosted on **SAP Analytics Cloud (SAC)**. To access it:
 ## 3. Using the Filters
 
 Three filters at the top of the page control what is shown across all charts simultaneously. Any change you make is applied immediately to every visual on the page.
+
+![alt text](assets/SAC/filters.png)
 
 | Filter | Default value | What it does |
 |---|---|---|
@@ -49,11 +53,13 @@ Three filters at the top of the page control what is shown across all charts sim
 
 The four KPI cards at the top of the page give an instant summary of the selected period. They update automatically when you change any filter.
 
+![alt text](assets/SAC/kpis.png)
+
 | KPI Card | Example value | What it means |
 |---|---|---|
 | **Number of Failings** | 2,897 | Total number of 5-minute sensor readings recorded in an `Error` state across all inverters and all days in the selected period. A high number indicates repeated or sustained faults. |
 | **Overall Failure Rate** | 3.60 % | Percentage of all sensor readings that were in a fault state. Calculated as: `Error readings ÷ total readings × 100`. A rate above **5%** warrants investigation. |
-| **Average Performance Ratio** | 37.95 % | Average daily efficiency of the inverters across the period, including days with zero production (nights, standby). A higher value means the inverters converted a greater share of available solar energy into electricity. Colour indicator: 🟢 ≥ 85% · 🟠 75–84% · 🔴 < 75%. |
+| **Average Performance Ratio** | 37.95 % | Average daily efficiency of the inverters across the period, including days with zero production (nights, standby). A higher value means the inverters converted a greater share of available solar energy into electricity. |
 | **Days with Failures** | 80 | Number of distinct calendar days on which at least one inverter recorded a fault. Use this alongside the line chart to understand whether faults are concentrated in a short window or spread across the period. |
 
 ---
@@ -64,6 +70,8 @@ The four KPI cards at the top of the page give an instant summary of the selecte
 
 This chart plots the **daily count of fault readings** across the entire fleet for each day in the selected period. Each point represents the total number of 5-minute slots during which at least one inverter was in an `Error` state.
 
+![alt text](assets/SAC/errors_over_days.png)
+
 - **A spike** indicates a day with sustained or repeated faults — worth cross-referencing with the inverter breakdown chart.
 - **A sudden drop to near-zero** (as seen around 14 March 2023) typically means a fault cleared or was resolved.
 - Use the **Date Range** filter to zoom into a specific incident window for finer analysis.
@@ -73,6 +81,8 @@ This chart plots the **daily count of fault readings** across the entire fleet f
 ### 5.2 Number of Errors per Inverter (Horizontal Bar Chart)
 
 Shows the **cumulative fault reading count** for each inverter over the selected period. Bars are sorted from highest to lowest to immediately surface the most problematic unit.
+
+![alt text](assets/SAC/nb_errors.png)
 
 | Inverter | Error readings | Interpretation |
 |---|---|---|
@@ -88,6 +98,10 @@ Shows the **cumulative fault reading count** for each inverter over the selected
 
 Each bar represents one inverter and shows how its daily reading time was distributed across the four status categories as a percentage of the total. This gives a **health profile at a glance**.
 
+
+
+![alt text](assets/SAC/overall_status.png)
+
 | Status | Colour | Meaning |
 |---|---|---|
 | **OK** | Orange | Standby — inverter is powered and healthy but not producing (typical at night or on low-irradiation days). |
@@ -101,13 +115,9 @@ Each bar represents one inverter and shows how its daily reading time was distri
 
 ### 5.4 Average Performance Ratio per Inverter (Horizontal Bar)
 
-Displays the **average efficiency** of each inverter across the selected period. The performance ratio measures how much of the theoretically available solar energy was actually converted to electricity — a ratio of 100% would mean perfect conversion with no losses.
+![alt text](assets/SAC/performance_ratio.png)
 
-| Bar colour | Threshold | Status |
-|---|---|---|
-| 🟢 Green | ≥ 85% | Operating at or above target efficiency |
-| 🟠 Orange | 75–84% | Slightly below target — monitor closely |
-| 🔴 Red | < 75% | Underperforming — investigation recommended |
+Displays the **average efficiency** of each inverter across the selected period. The performance ratio measures how much of the theoretically available solar energy was actually converted to electricity — a ratio of 100% would mean perfect conversion with no losses.
 
 > **Note:** The ratio includes all days in the period, including days with no production (ratio = 0). INV-01 (5.92%) and INV-02 (1.94%) appear very low because they spent most of the period in standby or fault state with minimal productive hours — not because they are inefficient when running.
 
@@ -166,16 +176,18 @@ The CSV file delivered by the pipeline is already fully prepared: all calculatio
 
 ### 7.2 Step 1 — Install Microsoft Azure Storage Explorer *(first time only)*
 
-Azure Storage Explorer is a free desktop application from Microsoft that lets you browse and download files from the secure cloud storage container. You only need to install it once.
+Azure Storage Explorer is a free desktop application from Microsoft that lets you browse and download files from the secure cloud file share. You only need to install it once.
 
 1. **Download** — Go to [https://azure.microsoft.com/en-us/products/storage/storage-explorer/](https://azure.microsoft.com/en-us/products/storage/storage-explorer/) and click **Download now**.
 2. **Install** — Run the installer and follow the on-screen instructions (Windows, Mac, and Linux are all supported).
 3. **Sign in** — Open Azure Storage Explorer. Click the plug icon (**Connect to Azure resources**) in the top-left toolbar.
 4. **Select account type** — Choose **Subscription**, then click **Next**.
-5. **Authenticate** — A browser window will open. Sign in with your HES-SO credentials (same as your institutional email login).
-6. **Find the container** — In the left panel, expand **Storage Accounts → adlsbellevuegrp3 → Blob Containers → sacexport**. This is the only container you will have access to.
+5. **Authenticate** — A browser window will open. Sign in with your HES-SO credentials.
+6. **Find the container** — In the left panel, expand **Storage Accounts → adlsbellevuegrp3 → File Shares → sac-export-share**. This is the only container you will have access to.
 
-> **Note:** If you cannot see the `sacexport` container or receive an authorisation error, contact your data engineer to confirm your account has been added to the `GRP_Bellevue_SAC_Analysts` access group.
+![alt text](assets/SAC/storage_explorer.png)
+
+> **Note:** If you cannot see the `sac-export-share` fileshare or receive an authorisation error, contact your data engineer to confirm your account has been added to the `GRP_Bellevue_SAC_Analysts` access group.
 
 ---
 
@@ -183,7 +195,7 @@ Azure Storage Explorer is a free desktop application from Microsoft that lets yo
 
 Each time the dashboard needs to be refreshed, download the latest CSV file:
 
-1. **Open Storage Explorer** — Navigate to `sacexport` in the left panel (as set up in Step 1).
+1. **Open Storage Explorer** — Navigate to `sac-export.share` in the left panel (as set up in Step 1).
 2. **Locate the file** — In the main panel, find the file named `sac_inverter_combined.csv`. Check the **Last Modified** date to confirm it was updated today (after 07:30).
 3. **Download** — Right-click the file and select **Download**, or select it and click the **Download** button in the toolbar.
 4. **Save locally** — Choose a location on your computer (e.g., your Downloads folder). **Do not rename the file** — keep it as `sac_inverter_combined.csv`.
@@ -195,7 +207,7 @@ Each time the dashboard needs to be refreshed, download the latest CSV file:
 The CSV is imported directly into the SAC model using the model's built-in import job. There is no intermediate dataset or data preparation step — the file is ready to use as-is.
 
 1. **Open SAC** — Log in to SAP Analytics Cloud with your HES-SO credentials.
-2. **Navigate to the model** — In the left navigation panel, click **Files**. Locate and open the model named **Bellevue_InverterFailure_Model** in the Modeler.
+2. **Navigate to the model** — In the left navigation panel, click on **Modeller**. Locate and open the model named **SolarPanel_Model** in the Modeler.
 3. **Open Data Management** — Click **Data Management** in the top toolbar. The Data Integration tab will open, showing Draft Sources and Import Jobs.
 4. **Import new data** — In the Draft Sources section, click the import icon (**↓ arrow**, top right of the section). Select **Upload a file** and browse to the `sac_inverter_combined.csv` file you downloaded in Step 2.
 5. **Map columns** — SAC will display a column mapping screen. Verify that all columns are correctly mapped to their model counterparts (this should be automatic after the first time). Click **Import**.
