@@ -5,7 +5,11 @@ On-premises sources are ingested daily into an Azure Medallion Lakehouse,
 transformed by Databricks, scored by a KNIME ML server, and served to SAP
 Analytics Cloud and Power BI.
 
-> **Interactive diagram** — [View live architecture](https://sandersdHES.github.io/ADF_DataCycleProject/bellevue_architecture.html) *(requires GitHub Pages to be enabled — see setup below)*
+> **Interactive diagram** — [View live architecture](https://sandersdHES.github.io/ADF_DataCycleProject/bellevue_architecture.html)
+>
+> **GitHub Pages setup (one-time):** Go to **Settings → Pages → Source**, choose **Deploy from a branch**, select branch `main` and folder `/docs`, then click **Save**. The diagram will be live at the URL above within ~1 minute.
+>
+> *The HTML file is at `docs/bellevue_architecture.html`. GitHub renders `.html` files as raw source in the repository view — GitHub Pages is the only way to run it as a live interactive page.*
 
 ---
 
